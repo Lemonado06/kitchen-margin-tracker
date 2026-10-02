@@ -27,6 +27,12 @@ app.use('/fee-rules', feeRuleRoutes(pool));
 const orderRoutes = require('./orders');
 app.use('/orders', orderRoutes(pool));
 
+const dashboardRoutes = require('./dashboard');
+app.use('/dashboard', dashboardRoutes(pool));
+
+const aiRoutes = require('./ai');
+app.use('/ai', aiRoutes(pool));
+
 app.get('/health', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
