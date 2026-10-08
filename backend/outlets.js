@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('./middleware');
+const { requireAuth, requireRole } = require('./middleware');
 
 module.exports = (pool) => {
   // CREATE outlet
@@ -31,10 +31,11 @@ module.exports = (pool) => {
   // UPDATE outlet
   router.put('/:id', requireAuth, async (req, res) => {
     const { name, city } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
     try {
       const result = await pool.query(
         'UPDATE outlets SET name = $1, city = $2 WHERE id = $3 AND owner_id = $4 RETURNING *',
-        [name, city, req.params.id, req.user.id]
+        [name, city || null, req.params.id, req.user.id]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Outlet not found' });
       res.json(result.rows[0]);
@@ -43,8 +44,8 @@ module.exports = (pool) => {
     }
   });
 
-  // DELETE outlet
-  router.delete('/:id', requireAuth, async (req, res) => {
+  // DELETE outlet (owners only)
+  router.delete('/:id', requireAuth, requireRole('owner'), async (req, res) => {
     try {
       const result = await pool.query('DELETE FROM outlets WHERE id = $1 AND owner_id = $2 RETURNING *', [req.params.id, req.user.id]);
       if (result.rows.length === 0) return res.status(404).json({ error: 'Outlet not found' });

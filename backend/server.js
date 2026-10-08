@@ -24,6 +24,9 @@ app.use('/platforms', platformRoutes(pool));
 const feeRuleRoutes = require('./feeRules');
 app.use('/fee-rules', feeRuleRoutes(pool));
 
+const recipeItemRoutes = require('./recipeItems');
+app.use('/recipe-items', recipeItemRoutes(pool));
+
 const orderRoutes = require('./orders');
 app.use('/orders', orderRoutes(pool));
 

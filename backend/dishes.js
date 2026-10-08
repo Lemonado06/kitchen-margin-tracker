@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('./middleware');
+const { requireAuth, requireRole } = require('./middleware');
 
 module.exports = (pool) => {
   // Helper: confirm the outlet belongs to this user
@@ -15,6 +15,7 @@ module.exports = (pool) => {
     if (!outlet_id || !name || price == null) {
       return res.status(400).json({ error: 'outlet_id, name, and price are required' });
     }
+    if (isNaN(price) || price <= 0) return res.status(400).json({ error: 'Price must be a positive number' });
     const owns = await verifyOutletOwnership(outlet_id, req.user.id);
     if (!owns) return res.status(403).json({ error: 'You do not own this outlet' });
 
@@ -45,6 +46,9 @@ module.exports = (pool) => {
   // UPDATE dish
   router.put('/:id', requireAuth, async (req, res) => {
     const { name, price } = req.body;
+    if (!name || price == null || isNaN(price) || price <= 0) {
+      return res.status(400).json({ error: 'Name and a positive price are required' });
+    }
     try {
       // join to outlets to confirm ownership in one query
       const check = await pool.query(
@@ -63,8 +67,8 @@ module.exports = (pool) => {
     }
   });
 
-  // DELETE dish
-  router.delete('/:id', requireAuth, async (req, res) => {
+  // DELETE dish (owners only)
+  router.delete('/:id', requireAuth, requireRole('owner'), async (req, res) => {
     try {
       const check = await pool.query(
         `SELECT d.id FROM dishes d JOIN outlets o ON d.outlet_id = o.id WHERE d.id = $1 AND o.owner_id = $2`,

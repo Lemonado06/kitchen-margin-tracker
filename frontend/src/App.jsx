@@ -5,7 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Outlets from './pages/Outlets';
 import Dishes from './pages/Dishes';
 import Orders from './pages/Orders';
-
+import FeeRules from './pages/FeeRules';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -13,11 +14,13 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/outlets" element={<Outlets />} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/outlets" element={<ProtectedRoute><Outlets /></ProtectedRoute>} />
+        <Route path="/outlets/:outletId/dishes" element={<ProtectedRoute><Dishes /></ProtectedRoute>} />
+        <Route path="/outlets/:outletId/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+        <Route path="/outlets/:outletId/fee-rules" element={<ProtectedRoute><FeeRules /></ProtectedRoute>} />
         <Route path="/" element={<Navigate to="/login" />} />
-        <Route path="/outlets/:outletId/dishes" element={<Dishes />} />
-        <Route path="/outlets/:outletId/orders" element={<Orders />} />
+        <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
     </BrowserRouter>
   );

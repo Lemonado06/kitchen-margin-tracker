@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import api from '../api/client';
+import api, { getUser, logout } from '../api/client';
 import AIChat from '../components/AIChat';
 
 export default function Dashboard() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const user = getUser();
+  const navigate = useNavigate();
   const [outlets, setOutlets] = useState([]);
   const [platforms, setPlatforms] = useState([]);
   const [outletId, setOutletId] = useState('');
@@ -51,6 +52,11 @@ export default function Dashboard() {
     loadMargins();
   }, [outletId, platformId, dateFrom, dateTo]);
 
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
+
   function fmt(n) {
     return '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
   }
@@ -63,7 +69,10 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold text-gray-800">Profit Dashboard</h1>
           <p className="text-sm text-gray-500">Welcome, {user.name} ({user.role})</p>
         </div>
-        <Link to="/outlets" className="text-green-700 text-sm font-medium hover:underline">Manage Outlets &rarr;</Link>
+        <div className="flex items-center gap-4">
+          <Link to="/outlets" className="text-green-700 text-sm font-medium hover:underline">Manage Outlets &rarr;</Link>
+          <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-600">Logout</button>
+        </div>
       </header>
 
       <div className="p-8 max-w-6xl mx-auto">

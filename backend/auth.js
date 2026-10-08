@@ -3,12 +3,20 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 
+const ALLOWED_ROLES = ['owner', 'manager'];
+
 module.exports = (pool) => {
   // REGISTER
   router.post('/register', async (req, res) => {
     const { name, email, password, role } = req.body;
     if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'All fields required' });
+    }
+    if (!ALLOWED_ROLES.includes(role)) {
+      return res.status(400).json({ error: `Role must be one of: ${ALLOWED_ROLES.join(', ')}` });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     try {
       const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
@@ -29,6 +37,9 @@ module.exports = (pool) => {
   // LOGIN
   router.post('/login', async (req, res) => {
     const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
     try {
       const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
       if (result.rows.length === 0) {

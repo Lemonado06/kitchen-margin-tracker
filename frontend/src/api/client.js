@@ -12,4 +12,31 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Expired or invalid token: clear the session and send the user back to login
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const isAuthCall = err.config?.url?.startsWith('/auth/');
+    if (err.response?.status === 401 && !isAuthCall) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+export function getUser() {
+  return JSON.parse(localStorage.getItem('user') || '{}');
+}
+
+export function isOwner() {
+  return getUser().role === 'owner';
+}
+
+export function logout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+}
+
 export default api;

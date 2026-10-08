@@ -13,6 +13,10 @@ export default function Register() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
     try {
       await api.post('/auth/register', { name, email, password, role });
       // auto-login after successful register
@@ -48,7 +52,8 @@ export default function Register() {
         />
         <input
           type="password"
-          placeholder="Password"
+          placeholder="Password (min 6 characters)"
+          minLength={6}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full border border-gray-300 rounded px-3 py-2 mb-3"

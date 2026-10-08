@@ -4,16 +4,18 @@ async function getMarginsData(pool, outletId, filters = {}) {
     SELECT o.id, o.order_date, o.order_value, o.discount_amount, o.packaging_cost,
            d.id as dish_id, d.name as dish_name,
            p.name as platform_name,
-           pfr.commission_pct, pfr.gst_on_commission_pct,
+           COALESCE(pfr.commission_pct, 0) as commission_pct,
+           COALESCE(pfr.gst_on_commission_pct, 18) as gst_on_commission_pct,
            COALESCE((SELECT SUM(ri.cost) FROM recipe_items ri WHERE ri.dish_id = d.id), 0) as food_cost
     FROM orders o
     JOIN dishes d ON o.dish_id = d.id
     JOIN platforms p ON o.platform_id = p.id
-    JOIN platform_fee_rules pfr ON pfr.outlet_id = o.outlet_id AND pfr.platform_id = o.platform_id
+    LEFT JOIN platform_fee_rules pfr ON pfr.outlet_id = o.outlet_id AND pfr.platform_id = o.platform_id
     WHERE o.outlet_id = $1
   `;
   const params = [outletId];
   if (filters.platform_id) { params.push(filters.platform_id); query += ` AND o.platform_id = $${params.length}`; }
+  if (filters.dish_id) { params.push(filters.dish_id); query += ` AND o.dish_id = $${params.length}`; }
   if (filters.date_from) { params.push(filters.date_from); query += ` AND o.order_date >= $${params.length}`; }
   if (filters.date_to) { params.push(filters.date_to); query += ` AND o.order_date <= $${params.length}`; }
 
