@@ -69,17 +69,26 @@ module.exports = (pool) => {
 
   // DELETE dish (owners only)
   router.delete('/:id', requireAuth, requireRole('owner'), async (req, res) => {
-    try {
-      const check = await pool.query(
-        `SELECT d.id FROM dishes d JOIN outlets o ON d.outlet_id = o.id WHERE d.id = $1 AND o.owner_id = $2`,
-        [req.params.id, req.user.id]
-      );
-      if (check.rows.length === 0) return res.status(404).json({ error: 'Dish not found' });
+    const check = await pool.query(
+      `SELECT d.id FROM dishes d JOIN outlets o ON d.outlet_id = o.id WHERE d.id = $1 AND o.owner_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (check.rows.length === 0) return res.status(404).json({ error: 'Dish not found' });
 
-      await pool.query('DELETE FROM dishes WHERE id = $1', [req.params.id]);
+    // Foreign keys don't cascade, so remove the dish's orders and recipe items in the same transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM orders WHERE dish_id = $1', [req.params.id]);
+      await client.query('DELETE FROM recipe_items WHERE dish_id = $1', [req.params.id]);
+      await client.query('DELETE FROM dishes WHERE id = $1', [req.params.id]);
+      await client.query('COMMIT');
       res.json({ deleted: true });
     } catch (err) {
+      await client.query('ROLLBACK');
       res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
     }
   });
 
