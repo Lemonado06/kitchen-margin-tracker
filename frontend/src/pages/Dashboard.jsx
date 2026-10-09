@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api, { getUser, logout } from '../api/client';
 import AIChat from '../components/AIChat';
 
@@ -131,13 +131,18 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               <div className="bg-white rounded-xl shadow-sm p-4">
                 <h2 className="font-semibold text-gray-800 mb-4">Profit by Dish</h2>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={data.dishBreakdown}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="dish_name" tick={{ fontSize: 11 }} />
-                    <YAxis />
+                {/* Horizontal bars so full dish names fit on the axis */}
+                <ResponsiveContainer width="100%" height={Math.max(250, data.dishBreakdown.length * 40)}>
+                  <BarChart data={data.dishBreakdown} layout="vertical" margin={{ left: 10, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tickFormatter={(v) => fmt(v)} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="dish_name" width={140} interval={0} tick={{ fontSize: 12 }} />
                     <Tooltip formatter={(v) => fmt(v)} />
-                    <Bar dataKey="profit" fill="#047857" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="profit" radius={[0, 4, 4, 0]}>
+                      {data.dishBreakdown.map((d) => (
+                        <Cell key={d.dish_name} fill={d.profit >= 0 ? '#047857' : '#dc2626'} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
