@@ -1,26 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import api, { isOwner } from '../api/client';
+import Icon from './Icon';
+import { useConfirm, useLoad, useToast } from '../hooks';
+import { Button, Input } from './ui';
 
 // Ingredient cost list for one dish; the total is the dish's food cost
 export default function RecipeItems({ dishId, dishPrice }) {
-  const [items, setItems] = useState([]);
+  const [loaded, loadItems, loadError] = useLoad(() => api.get(`/recipe-items/dish/${dishId}`).then((res) => res.data), [dishId]);
+  const items = loaded || [];
   const [ingredient, setIngredient] = useState('');
   const [cost, setCost] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
-
-  async function loadItems() {
-    try {
-      const res = await api.get(`/recipe-items/dish/${dishId}`);
-      setItems(res.data);
-    } catch (err) {
-      setError('Failed to load recipe items');
-    }
-  }
-
-  useEffect(() => {
-    loadItems();
-  }, [dishId]);
+  const toast = useToast();
+  const confirm = useConfirm();
 
   function resetForm() {
     setIngredient('');
@@ -42,6 +35,7 @@ export default function RecipeItems({ dishId, dishPrice }) {
       } else {
         await api.post('/recipe-items', { dish_id: dishId, ingredient_name: ingredient.trim(), cost: costNum });
       }
+      toast(editingId ? 'Ingredient updated' : 'Ingredient added');
       resetForm();
       loadItems();
     } catch (err) {
@@ -56,7 +50,7 @@ export default function RecipeItems({ dishId, dishPrice }) {
   }
 
   async function handleDelete(item) {
-    if (!window.confirm(`Remove "${item.ingredient_name}"?`)) return;
+    if (!(await confirm({ title: `Remove "${item.ingredient_name}"?`, message: 'The dish\'s food cost will drop by this amount.', confirmLabel: 'Remove' }))) return;
     try {
       await api.delete(`/recipe-items/${item.id}`);
       if (editingId === item.id) resetForm();
@@ -68,61 +62,50 @@ export default function RecipeItems({ dishId, dishPrice }) {
 
   const foodCost = items.reduce((s, i) => s + parseFloat(i.cost), 0);
   const foodCostPct = dishPrice > 0 ? (foodCost / dishPrice) * 100 : 0;
+  const barTone = foodCostPct > 45 ? 'from-rose-500 to-rose-400' : foodCostPct > 30 ? 'from-amber-500 to-amber-300' : 'from-emerald-500 to-cyan-400';
 
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4">
-      <table className="w-full text-sm mb-3">
-        <tbody className="divide-y divide-gray-100">
-          {items.map((item) => (
-            <tr key={item.id}>
-              <td className="py-2 text-gray-700">{item.ingredient_name}</td>
-              <td className="py-2 text-right text-gray-700">₹{item.cost}</td>
-              <td className="py-2 text-right w-32">
-                <button onClick={() => startEdit(item)} className="text-gray-600 hover:text-gray-900 mr-3">Edit</button>
-                {isOwner() && (
-                  <button onClick={() => handleDelete(item)} className="text-red-600 hover:text-red-800">Delete</button>
-                )}
-              </td>
-            </tr>
-          ))}
-          {items.length === 0 && (
-            <tr><td colSpan="3" className="py-2 text-gray-400">No ingredients yet. Food cost counts as ₹0.</td></tr>
-          )}
-        </tbody>
-      </table>
+    <div className="mt-4 border-t border-white/10 pt-4 animate-fade-up">
+      <div className="mb-4">
+        <div className="mb-1.5 flex items-baseline justify-between text-sm">
+          <span className="font-semibold text-white">Food cost: ₹{foodCost.toFixed(2)}</span>
+          <span className="text-slate-400">{foodCostPct.toFixed(1)}% of price</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+          <div className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${barTone}`} style={{ width: `${Math.min(100, foodCostPct)}%` }} />
+        </div>
+      </div>
 
-      <p className="text-sm font-medium text-gray-800 mb-3">
-        Food cost: ₹{foodCost.toFixed(2)} <span className="text-gray-500 font-normal">({foodCostPct.toFixed(1)}% of price)</span>
-      </p>
+      <ul className="mb-3 divide-y divide-white/5">
+        {items.map((item) => (
+          <li key={item.id} className="group flex items-center justify-between py-2 text-sm animate-fade-in">
+            <span className="text-slate-200">{item.ingredient_name}</span>
+            <span className="flex items-center gap-3">
+              <span className="text-slate-300">₹{item.cost}</span>
+              <button onClick={() => startEdit(item)} className="rounded-md p-1 text-slate-500 transition hover:bg-white/10 hover:text-white" aria-label="Edit ingredient">
+                <Icon name="edit" className="w-3.5 h-3.5" />
+              </button>
+              {isOwner() && (
+                <button onClick={() => handleDelete(item)} className="rounded-md p-1 text-slate-500 transition hover:bg-rose-500/15 hover:text-rose-300" aria-label="Delete ingredient">
+                  <Icon name="trash" className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </span>
+          </li>
+        ))}
+        {items.length === 0 && <li className="py-2 text-sm text-slate-500">No ingredients yet. Food cost counts as ₹0.</li>}
+      </ul>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Ingredient"
-          value={ingredient}
-          onChange={(e) => setIngredient(e.target.value)}
-          className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm"
-          required
-        />
-        <input
-          type="number"
-          placeholder="Cost (₹)"
-          min="0"
-          step="0.01"
-          value={cost}
-          onChange={(e) => setCost(e.target.value)}
-          className="w-28 border border-gray-300 rounded px-3 py-1.5 text-sm"
-          required
-        />
-        <button type="submit" className="bg-gray-800 text-white rounded px-3 py-1.5 text-sm hover:bg-gray-900">
-          {editingId ? 'Save' : 'Add'}
-        </button>
-        {editingId && (
-          <button type="button" onClick={resetForm} className="text-gray-500 text-sm px-2">Cancel</button>
-        )}
+      <form onSubmit={handleSubmit} className={`flex flex-col gap-2 sm:flex-row ${editingId ? 'rounded-xl ring-2 ring-amber-400/60 p-2' : ''}`}>
+        <Input type="text" placeholder="Ingredient" value={ingredient} onChange={(e) => setIngredient(e.target.value)} required />
+        <Input type="number" placeholder="Cost (₹)" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} className="sm:w-32" required />
+        <div className="flex gap-2">
+          <Button type="submit" variant="ghost" icon={editingId ? 'check' : 'plus'}>{editingId ? 'Save' : 'Add'}</Button>
+          {editingId && <Button type="button" variant="subtle" onClick={resetForm}>Cancel</Button>}
+        </div>
       </form>
 
-      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+      {(error || loadError) && <p className="mt-2 text-sm text-rose-300">{error || loadError}</p>}
     </div>
   );
 }

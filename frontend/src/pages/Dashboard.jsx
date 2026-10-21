@@ -1,13 +1,39 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import api, { getUser, logout } from '../api/client';
+import { useNavigate } from 'react-router-dom';
+import { BarChart, Bar, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import api, { getUser } from '../api/client';
 import AIChat from '../components/AIChat';
+import { formatINR } from '../hooks';
+import Icon from '../components/Icon';
+import { AnimatedNumber, Badge, Button, Card, EmptyState, ErrorText, Field, Input, PageHeader, Select, Skeleton } from '../components/ui';
+
+const axisProps = { stroke: 'rgb(148 163 184 / 0.4)', tick: { fill: '#94a3b8', fontSize: 11 }, tickLine: false };
+const tooltipProps = {
+  contentStyle: { background: 'rgb(15 23 42 / 0.9)', border: '1px solid rgb(255 255 255 / 0.12)', borderRadius: 12, backdropFilter: 'blur(12px)' },
+  labelStyle: { color: '#e2e8f0', fontWeight: 600 },
+  itemStyle: { color: '#cbd5e1' },
+  cursor: { fill: 'rgb(255 255 255 / 0.04)' },
+};
+
+function Kpi({ label, icon, tone, value, format, delay }) {
+  return (
+    <Card hover delay={delay} className="group relative overflow-hidden p-5">
+      <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full blur-2xl opacity-40 transition duration-500 group-hover:opacity-70 ${tone.glow}`} />
+      <div className="relative flex items-start justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+        <span className={`rounded-xl p-2 ${tone.icon}`}><Icon name={icon} className="w-4 h-4" /></span>
+      </div>
+      <p className={`relative mt-3 text-3xl font-bold tracking-tight ${tone.text}`}>
+        <AnimatedNumber value={value} format={format} />
+      </p>
+    </Card>
+  );
+}
 
 export default function Dashboard() {
   const user = getUser();
   const navigate = useNavigate();
-  const [outlets, setOutlets] = useState([]);
+  const [outlets, setOutlets] = useState(null);
   const [platforms, setPlatforms] = useState([]);
   const [outletId, setOutletId] = useState('');
   const [platformId, setPlatformId] = useState('');
@@ -15,19 +41,15 @@ export default function Dashboard() {
   const [dateTo, setDateTo] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  
 
   useEffect(() => {
     async function loadFilters() {
       try {
-        const [outletsRes, platformsRes] = await Promise.all([
-          api.get('/outlets'),
-          api.get('/platforms'),
-        ]);
+        const [outletsRes, platformsRes] = await Promise.all([api.get('/outlets'), api.get('/platforms')]);
         setOutlets(outletsRes.data);
         setPlatforms(platformsRes.data);
         if (outletsRes.data.length > 0) setOutletId(outletsRes.data[0].id);
-      } catch (err) {
+      } catch {
         setError('Failed to load filters');
       }
     }
@@ -52,172 +74,177 @@ export default function Dashboard() {
     loadMargins();
   }, [outletId, platformId, dateFrom, dateTo]);
 
-  function handleLogout() {
-    logout();
-    navigate('/login');
+  const hasFilters = platformId || dateFrom || dateTo;
+  function clearFilters() {
+    setPlatformId('');
+    setDateFrom('');
+    setDateTo('');
   }
 
-  function fmt(n) {
-    return '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
+
+  if (outlets && outlets.length === 0) {
+    return (
+      <>
+        <PageHeader title={`${greeting}, ${user.name?.split(' ')[0]}`} subtitle="Your profit dashboard" />
+        <EmptyState icon="store" title="No outlets yet">
+          Add your first outlet, then its dishes and orders, and your margins will show up here.
+          <span className="mt-4 block"><Button icon="plus" onClick={() => navigate('/outlets')}>Add an outlet</Button></span>
+        </EmptyState>
+      </>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
-      <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Profit Dashboard</h1>
-          <p className="text-sm text-gray-500">Welcome, {user.name} ({user.role})</p>
+    <>
+      <PageHeader title={`${greeting}, ${user.name?.split(' ')[0]}`} subtitle="Profit after commission, GST, discounts, packaging and food cost." />
+
+      {/* Filters */}
+      <Card className="relative z-10 mb-6 grid grid-cols-2 gap-4 p-5 md:grid-cols-4">
+        <Field label="Outlet">
+          <Select value={outletId} onChange={(e) => setOutletId(e.target.value)}>
+            {(outlets || []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="Platform">
+          <Select value={platformId} onChange={(e) => setPlatformId(e.target.value)}>
+            <option value="">All platforms</option>
+            {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </Select>
+        </Field>
+        <Field label="From">
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        </Field>
+        <Field label="To">
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        </Field>
+        {hasFilters && (
+          <button onClick={clearFilters} className="col-span-2 justify-self-start text-xs font-semibold text-emerald-300 hover:text-emerald-200 md:col-span-4 animate-fade-in">
+            Clear filters
+          </button>
+        )}
+      </Card>
+
+      <ErrorText>{error}</ErrorText>
+
+      {!data ? (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}
+          <Skeleton className="col-span-2 h-72" />
+          <Skeleton className="col-span-2 h-72" />
         </div>
-        <div className="flex items-center gap-4">
-          <Link to="/outlets" className="text-green-700 text-sm font-medium hover:underline">Manage Outlets &rarr;</Link>
-          <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-600">Logout</button>
-        </div>
-      </header>
+      ) : (
+        <>
+          {/* KPI cards */}
+          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+            <Kpi label="Total revenue" icon="wallet" value={data.kpis.totalRevenue} format={formatINR} delay={0}
+              tone={{ glow: 'bg-cyan-500', icon: 'bg-cyan-400/10 text-cyan-300', text: 'text-white' }} />
+            <Kpi label="Net profit" icon="trend" value={data.kpis.totalProfit} format={formatINR} delay={60}
+              tone={data.kpis.totalProfit >= 0
+                ? { glow: 'bg-emerald-500', icon: 'bg-emerald-400/10 text-emerald-300', text: 'text-emerald-300' }
+                : { glow: 'bg-rose-500', icon: 'bg-rose-400/10 text-rose-300', text: 'text-rose-300' }} />
+            <Kpi label="Margin" icon="percent" value={data.kpis.marginPct} format={(v) => `${v.toFixed(1)}%`} delay={120}
+              tone={{ glow: 'bg-violet-500', icon: 'bg-violet-400/10 text-violet-300', text: 'text-white' }} />
+            <Kpi label="Orders" icon="bag" value={data.kpis.orderCount} format={(v) => Math.round(v)} delay={180}
+              tone={{ glow: 'bg-amber-500', icon: 'bg-amber-400/10 text-amber-300', text: 'text-white' }} />
+          </div>
 
-      <div className="p-8 max-w-6xl mx-auto">
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Outlet</label>
-            <select value={outletId} onChange={(e) => setOutletId(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1">
-              {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
+          {/* Charts */}
+          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card delay={200} className="p-5">
+              <h2 className="mb-4 font-semibold text-white">Profit by dish</h2>
+              {/* Horizontal bars so full dish names fit on the axis */}
+              <ResponsiveContainer width="100%" height={Math.max(250, data.dishBreakdown.length * 44)}>
+                <BarChart data={data.dishBreakdown} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" horizontal={false} />
+                  <XAxis type="number" tickFormatter={formatINR} {...axisProps} />
+                  <YAxis type="category" dataKey="dish_name" width={130} interval={0} {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
+                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
+                  <Bar dataKey="profit" name="Profit" radius={[0, 8, 8, 0]} animationDuration={900}>
+                    {data.dishBreakdown.map((d) => (
+                      <Cell key={d.dish_name} fill={d.profit >= 0 ? 'url(#profitBar)' : 'url(#lossBar)'} />
+                    ))}
+                  </Bar>
+                  <defs>
+                    <linearGradient id="profitBar" x1="0" x2="1"><stop offset="0%" stopColor="#10b981" /><stop offset="100%" stopColor="#22d3ee" /></linearGradient>
+                    <linearGradient id="lossBar" x1="0" x2="1"><stop offset="0%" stopColor="#f43f5e" /><stop offset="100%" stopColor="#fb7185" /></linearGradient>
+                  </defs>
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+            <Card delay={260} className="p-5">
+              <h2 className="mb-4 font-semibold text-white">Profit trend</h2>
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={data.trend} margin={{ right: 10 }}>
+                  <defs>
+                    <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#818cf8" stopOpacity={0.35} /><stop offset="100%" stopColor="#818cf8" stopOpacity={0} /></linearGradient>
+                    <linearGradient id="profitFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity={0.45} /><stop offset="100%" stopColor="#34d399" stopOpacity={0} /></linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" vertical={false} />
+                  <XAxis dataKey="date" {...axisProps} />
+                  <YAxis tickFormatter={formatINR} width={60} {...axisProps} />
+                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} cursor={{ stroke: 'rgb(255 255 255 / 0.2)' }} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
+                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#818cf8" strokeWidth={2} fill="url(#revFill)" animationDuration={1000} />
+                  <Area type="monotone" dataKey="profit" name="Profit" stroke="#34d399" strokeWidth={2.5} fill="url(#profitFill)" animationDuration={1000} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Card>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">Platform</label>
-            <select value={platformId} onChange={(e) => setPlatformId(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1">
-              <option value="">All Platforms</option>
-              {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">From</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase">To</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1" />
-          </div>
-        </div>
 
-        {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+          {/* AI Assistant */}
+          <div className="mb-6">
+            <AIChat
+              outletId={outletId}
+              filters={{
+                platform_id: platformId || undefined,
+                date_from: dateFrom || undefined,
+                date_to: dateTo || undefined,
+              }}
+            />
+          </div>
 
-        {data && (
-          <>
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-800 mt-1">{fmt(data.kpis.totalRevenue)}</p>
-              </div>
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase">Net Profit</p>
-                <p className={`text-2xl font-bold mt-1 ${data.kpis.totalProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                  {fmt(data.kpis.totalProfit)}
-                </p>
-              </div>
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase">Margin %</p>
-                <p className="text-2xl font-bold text-gray-800 mt-1">{data.kpis.marginPct.toFixed(1)}%</p>
-              </div>
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase">Orders</p>
-                <p className="text-2xl font-bold text-gray-800 mt-1">{data.kpis.orderCount}</p>
-              </div>
+          {/* Dish table, worst margin first */}
+          <Card delay={320} className="overflow-hidden">
+            <div className="border-b border-white/10 p-5">
+              <h2 className="font-semibold text-white">Dishes ranked by margin</h2>
+              <p className="text-sm text-slate-400">Worst performers first</p>
             </div>
-
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <h2 className="font-semibold text-gray-800 mb-4">Profit by Dish</h2>
-                {/* Horizontal bars so full dish names fit on the axis */}
-                <ResponsiveContainer width="100%" height={Math.max(250, data.dishBreakdown.length * 40)}>
-                  <BarChart data={data.dishBreakdown} layout="vertical" margin={{ left: 10, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" tickFormatter={(v) => fmt(v)} tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="dish_name" width={140} interval={0} tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v) => fmt(v)} />
-                    <Bar dataKey="profit" radius={[0, 4, 4, 0]}>
-                      {data.dishBreakdown.map((d) => (
-                        <Cell key={d.dish_name} fill={d.profit >= 0 ? '#047857' : '#dc2626'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="bg-white rounded-xl shadow-sm p-4">
-                <h2 className="font-semibold text-gray-800 mb-4">Profit Trend</h2>
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={data.trend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis />
-                    <Tooltip formatter={(v) => fmt(v)} />
-                    <Line type="monotone" dataKey="profit" stroke="#047857" strokeWidth={2} />
-                    <Line type="monotone" dataKey="revenue" stroke="#9ca3af" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-                        {/* AI Assistant */}
-            <div className="mb-6">
-              <AIChat
-                outletId={outletId}
-                filters={{
-                  platform_id: platformId || undefined,
-                  date_from: dateFrom || undefined,
-                  date_to: dateTo || undefined,
-                }}
-              />
-            </div>
-
-            {/* Dish table, worst margin first */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-800">Dishes Ranked by Margin</h2>
-                <p className="text-sm text-gray-500">Worst performers first</p>
-              </div>
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
-                  <tr>
-                    <th className="text-left py-2 px-4">Dish</th>
-                    <th className="text-right py-2 px-4">Orders</th>
-                    <th className="text-right py-2 px-4">Revenue</th>
-                    <th className="text-right py-2 px-4">Profit</th>
-                    <th className="text-right py-2 px-4">Margin %</th>
+                <thead className="text-xs uppercase tracking-wider text-slate-400">
+                  <tr className="border-b border-white/5">
+                    <th className="px-5 py-3 text-left font-semibold">Dish</th>
+                    <th className="px-5 py-3 text-right font-semibold">Orders</th>
+                    <th className="px-5 py-3 text-right font-semibold">Revenue</th>
+                    <th className="px-5 py-3 text-right font-semibold">Profit</th>
+                    <th className="px-5 py-3 text-right font-semibold">Margin</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {data.dishBreakdown.map((d) => (
-                    <tr key={d.dish_name}>
-                      <td className="py-3 px-4 font-medium text-gray-800">{d.dish_name}</td>
-                      <td className="py-3 px-4 text-right text-gray-600">{d.orders}</td>
-                      <td className="py-3 px-4 text-right text-gray-600">{fmt(d.revenue)}</td>
-                      <td className={`py-3 px-4 text-right font-semibold ${d.profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                        {fmt(d.profit)}
+                <tbody>
+                  {data.dishBreakdown.map((d, i) => (
+                    <tr key={d.dish_name} style={{ animationDelay: `${i * 50}ms` }}
+                      className="border-b border-white/5 transition hover:bg-white/[0.04] animate-fade-up">
+                      <td className="px-5 py-3.5 font-medium text-slate-100">{d.dish_name}</td>
+                      <td className="px-5 py-3.5 text-right text-slate-300">{d.orders}</td>
+                      <td className="px-5 py-3.5 text-right text-slate-300">{formatINR(d.revenue)}</td>
+                      <td className={`px-5 py-3.5 text-right font-semibold ${d.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                        {formatINR(d.profit)}
                       </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          d.marginPct < 10 ? 'bg-red-100 text-red-700' :
-                          d.marginPct < 20 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-green-100 text-green-700'
-                        }`}>
-                          {d.marginPct.toFixed(1)}%
-                        </span>
+                      <td className="px-5 py-3.5 text-right">
+                        <Badge tone={d.marginPct < 10 ? 'red' : d.marginPct < 20 ? 'amber' : 'green'}>{d.marginPct.toFixed(1)}%</Badge>
                       </td>
                     </tr>
                   ))}
                   {data.dishBreakdown.length === 0 && (
-                    <tr><td colSpan="5" className="py-6 text-center text-gray-400">No orders in this range yet.</td></tr>
+                    <tr><td colSpan="5" className="py-10 text-center text-slate-400">No orders in this range yet.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </>
-        )}
-      </div>
-    </div>
+          </Card>
+        </>
+      )}
+    </>
   );
 }

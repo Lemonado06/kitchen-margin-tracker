@@ -1,13 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth, requireRole } = require('./middleware');
+const { Order, Dish, Platform } = require('./models');
+const { validId, outletFor, orderFor } = require('./access');
 
-module.exports = (pool) => {
-  async function verifyOutletOwnership(outletId, userId) {
-    const result = await pool.query('SELECT id FROM outlets WHERE id = $1 AND owner_id = $2', [outletId, userId]);
-    return result.rows.length > 0;
-  }
+// Without foreign keys, check that the dish is on this outlet's menu and the platform exists
+async function checkRefs(outletId, dishId, platformId, orderDate) {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(orderDate)) || isNaN(toDay(orderDate))) return 'order_date must be YYYY-MM-DD';
+  if (!validId(dishId) || !(await Dish.exists({ _id: dishId, outlet_id: outletId }))) return 'Dish not found for this outlet';
+  if (!validId(platformId) || !(await Platform.exists({ _id: platformId }))) return 'Platform not found';
+  return null;
+}
 
+// "2026-09-25" -> UTC midnight, so the calendar day never shifts with the server's time zone
+const toDay = (value) => new Date(`${String(value).slice(0, 10)}T00:00:00.000Z`);
+
+module.exports = () => {
   // CREATE order
   router.post('/', requireAuth, async (req, res) => {
     const { outlet_id, platform_id, dish_id, order_date, order_value, discount_amount, packaging_cost } = req.body;
@@ -17,49 +25,41 @@ module.exports = (pool) => {
     if (order_value <= 0 || discount_amount < 0 || packaging_cost < 0) {
       return res.status(400).json({ error: 'Order value must be positive and costs cannot be negative' });
     }
-    const owns = await verifyOutletOwnership(outlet_id, req.user.id);
-    if (!owns) return res.status(403).json({ error: 'You do not own this outlet' });
-
     try {
-      const result = await pool.query(
-        `INSERT INTO orders (outlet_id, platform_id, dish_id, order_date, order_value, discount_amount, packaging_cost)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [outlet_id, platform_id, dish_id, order_date, order_value, discount_amount || 0, packaging_cost || 0]
-      );
-      res.status(201).json(result.rows[0]);
+      if (!(await outletFor(outlet_id, req.user))) return res.status(403).json({ error: 'You do not own this outlet' });
+      const refError = await checkRefs(outlet_id, dish_id, platform_id, order_date);
+      if (refError) return res.status(400).json({ error: refError });
+
+      const order = await Order.create({
+        outlet_id, platform_id, dish_id,
+        order_date: toDay(order_date),
+        order_value,
+        discount_amount: discount_amount || 0,
+        packaging_cost: packaging_cost || 0,
+      });
+      res.status(201).json(order);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // GET orders for an outlet
+  // GET orders for an outlet, newest first, with dish and platform names
   router.get('/outlet/:outletId', requireAuth, async (req, res) => {
-    const owns = await verifyOutletOwnership(req.params.outletId, req.user.id);
-    if (!owns) return res.status(403).json({ error: 'You do not own this outlet' });
-
     try {
-      const result = await pool.query(
-        `SELECT o.*, d.name as dish_name, p.name as platform_name
-         FROM orders o
-         JOIN dishes d ON o.dish_id = d.id
-         JOIN platforms p ON o.platform_id = p.id
-         WHERE o.outlet_id = $1 ORDER BY o.order_date DESC`,
-        [req.params.outletId]
-      );
-      res.json(result.rows);
+      if (!(await outletFor(req.params.outletId, req.user))) return res.status(403).json({ error: 'You do not own this outlet' });
+      const orders = await Order.find({ outlet_id: req.params.outletId })
+        .sort({ order_date: -1, created_at: -1 })
+        .populate('dish_id', 'name')
+        .populate('platform_id', 'name');
+      res.json(orders.map((o) => ({
+        ...o.toJSON(),
+        dish_id: o.dish_id?.id, dish_name: o.dish_id?.name,
+        platform_id: o.platform_id?.id, platform_name: o.platform_id?.name,
+      })));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
-
-  // Helper: confirm the order belongs to one of this user's outlets
-  async function verifyOrderOwnership(orderId, userId) {
-    const result = await pool.query(
-      `SELECT o.id FROM orders o JOIN outlets ot ON o.outlet_id = ot.id WHERE o.id = $1 AND ot.owner_id = $2`,
-      [orderId, userId]
-    );
-    return result.rows.length > 0;
-  }
 
   // UPDATE order
   router.put('/:id', requireAuth, async (req, res) => {
@@ -71,15 +71,20 @@ module.exports = (pool) => {
       return res.status(400).json({ error: 'Order value must be positive and costs cannot be negative' });
     }
     try {
-      const owns = await verifyOrderOwnership(req.params.id, req.user.id);
-      if (!owns) return res.status(404).json({ error: 'Order not found' });
+      const order = await orderFor(req.params.id, req.user);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      const refError = await checkRefs(order.outlet_id, dish_id, platform_id, order_date);
+      if (refError) return res.status(400).json({ error: refError });
 
-      const result = await pool.query(
-        `UPDATE orders SET platform_id = $1, dish_id = $2, order_date = $3, order_value = $4, discount_amount = $5, packaging_cost = $6
-         WHERE id = $7 RETURNING *`,
-        [platform_id, dish_id, order_date, order_value, discount_amount || 0, packaging_cost || 0, req.params.id]
-      );
-      res.json(result.rows[0]);
+      Object.assign(order, {
+        platform_id, dish_id,
+        order_date: toDay(order_date),
+        order_value,
+        discount_amount: discount_amount || 0,
+        packaging_cost: packaging_cost || 0,
+      });
+      await order.save();
+      res.json(order);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -88,10 +93,9 @@ module.exports = (pool) => {
   // DELETE order (owners only)
   router.delete('/:id', requireAuth, requireRole('owner'), async (req, res) => {
     try {
-      const owns = await verifyOrderOwnership(req.params.id, req.user.id);
-      if (!owns) return res.status(404).json({ error: 'Order not found' });
-
-      await pool.query('DELETE FROM orders WHERE id = $1', [req.params.id]);
+      const order = await orderFor(req.params.id, req.user);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      await order.deleteOne();
       res.json({ deleted: true });
     } catch (err) {
       res.status(500).json({ error: err.message });

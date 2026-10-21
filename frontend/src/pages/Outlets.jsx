@@ -1,26 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api, { isOwner } from '../api/client';
+import Icon from '../components/Icon';
+import { useConfirm, useLoad, useToast } from '../hooks';
+import { Button, Card, EditingBanner, EmptyState, ErrorText, Input, PageHeader, Skeleton } from '../components/ui';
+
+const links = [
+  { to: 'dishes', label: 'Dishes', icon: 'chef' },
+  { to: 'orders', label: 'Orders', icon: 'receipt' },
+  { to: 'fee-rules', label: 'Fee rules', icon: 'percent' },
+];
 
 export default function Outlets() {
-  const [outlets, setOutlets] = useState([]);
+  const [outlets, loadOutlets, loadError] = useLoad(() => api.get('/outlets').then((res) => res.data), []);
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  async function loadOutlets() {
-    try {
-      const res = await api.get('/outlets');
-      setOutlets(res.data);
-    } catch (err) {
-      setError('Failed to load outlets');
-    }
-  }
-
-  useEffect(() => {
-    loadOutlets();
-  }, []);
+  const toast = useToast();
+  const confirm = useConfirm();
 
   function resetForm() {
     setName('');
@@ -35,16 +34,21 @@ export default function Outlets() {
       setError('Outlet name is required');
       return;
     }
+    setSaving(true);
     try {
       if (editingId) {
         await api.put(`/outlets/${editingId}`, { name: name.trim(), city: city.trim() });
+        toast('Outlet updated');
       } else {
         await api.post('/outlets', { name: name.trim(), city: city.trim() });
+        toast('Outlet added');
       }
       resetForm();
       loadOutlets(); // refresh list
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save outlet');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -52,14 +56,20 @@ export default function Outlets() {
     setEditingId(outlet.id);
     setName(outlet.name);
     setCity(outlet.city || '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function handleDelete(outlet) {
-    if (!window.confirm(`Delete "${outlet.name}"? Its dishes, orders and fee rules will also be deleted.`)) return;
+    const ok = await confirm({
+      title: `Delete "${outlet.name}"?`,
+      message: 'Its dishes, orders and fee rules will also be deleted. This cannot be undone.',
+    });
+    if (!ok) return;
     setError('');
     try {
       await api.delete(`/outlets/${outlet.id}`);
       if (editingId === outlet.id) resetForm();
+      toast('Outlet deleted');
       loadOutlets();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete outlet');
@@ -67,58 +77,68 @@ export default function Outlets() {
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      <Link to="/dashboard" className="text-blue-600 text-sm">&larr; Back to Dashboard</Link>
-      <h1 className="text-2xl font-bold mt-2 mb-6 text-gray-800">Outlets</h1>
+    <>
+      <PageHeader title="Outlets" subtitle="Each outlet has its own menu, orders and platform fees." />
 
-      <form onSubmit={handleSubmit} className="bg-white p-4 rounded-lg shadow mb-6 flex gap-2">
-        <input
-          type="text"
-          placeholder="Outlet name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="flex-1 border border-gray-300 rounded px-3 py-2"
-          required
-        />
-        <input
-          type="text"
-          placeholder="City"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          className="flex-1 border border-gray-300 rounded px-3 py-2"
-        />
-        <button type="submit" className="bg-blue-600 text-white rounded px-4 py-2 font-medium hover:bg-blue-700">
-          {editingId ? 'Save' : 'Add'}
-        </button>
-        {editingId && (
-          <button type="button" onClick={resetForm} className="text-gray-500 px-2 hover:text-gray-800">
-            Cancel
-          </button>
-        )}
-      </form>
+      <EditingBanner show={!!editingId} />
+      <Card as="form" onSubmit={handleSubmit}
+        className={`mb-8 flex flex-col gap-3 p-4 sm:flex-row ${editingId ? 'ring-2 ring-amber-400/60' : ''}`}>
+        <Input type="text" placeholder="Outlet name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input type="text" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
+        <div className="flex gap-2">
+          <Button type="submit" loading={saving} icon={editingId ? 'check' : 'plus'} className="flex-1 sm:flex-none">
+            {editingId ? 'Save' : 'Add'}
+          </Button>
+          {editingId && <Button type="button" variant="ghost" onClick={resetForm}>Cancel</Button>}
+        </div>
+      </Card>
 
-      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+      <ErrorText>{error || loadError}</ErrorText>
 
-      <div className="space-y-2">
-        {outlets.map((outlet) => (
-          <div key={outlet.id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
-            <div>
-              <p className="font-medium text-gray-800">{outlet.name}</p>
-              <p className="text-sm text-gray-500">{outlet.city}</p>
-            </div>
-            <div className="flex gap-4 items-center text-sm">
-              <Link to={`/outlets/${outlet.id}/dishes`} className="text-blue-600">Dishes</Link>
-              <Link to={`/outlets/${outlet.id}/orders`} className="text-blue-600">Orders</Link>
-              <Link to={`/outlets/${outlet.id}/fee-rules`} className="text-blue-600">Fee Rules</Link>
-              <button onClick={() => startEdit(outlet)} className="text-gray-600 hover:text-gray-900">Edit</button>
-              {isOwner() && (
-                <button onClick={() => handleDelete(outlet)} className="text-red-600 hover:text-red-800">Delete</button>
-              )}
-            </div>
-          </div>
-        ))}
-        {outlets.length === 0 && <p className="text-gray-500">No outlets yet. Add one above.</p>}
-      </div>
-    </div>
+      {!outlets ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-44" />)}</div>
+      ) : outlets.length === 0 ? (
+        <EmptyState icon="store" title="No outlets yet">Add your first outlet above.</EmptyState>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {outlets.map((outlet, i) => (
+            <Card key={outlet.id} hover delay={i * 70} className="group flex flex-col p-5">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 text-emerald-300 ring-1 ring-white/10 transition duration-300 group-hover:scale-110 group-hover:rotate-3">
+                    <Icon name="store" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">{outlet.name}</p>
+                    {outlet.city && (
+                      <p className="flex items-center gap-1 text-xs text-slate-400"><Icon name="pin" className="w-3 h-3" />{outlet.city}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-1 opacity-70 transition group-hover:opacity-100">
+                  <button onClick={() => startEdit(outlet)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="Edit outlet">
+                    <Icon name="edit" className="w-4 h-4" />
+                  </button>
+                  {isOwner() && (
+                    <button onClick={() => handleDelete(outlet)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300" aria-label="Delete outlet">
+                      <Icon name="trash" className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="mt-auto grid grid-cols-3 gap-2">
+                {links.map((l) => (
+                  <Link key={l.to} to={`/outlets/${outlet.id}/${l.to}`}
+                    className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-medium text-slate-300 transition hover:-translate-y-0.5 hover:border-emerald-400/40 hover:bg-emerald-400/10 hover:text-emerald-200">
+                    <Icon name={l.icon} className="w-4 h-4" />
+                    {l.label}
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </>
   );
 }

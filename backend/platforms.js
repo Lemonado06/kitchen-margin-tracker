@@ -1,18 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth, requireRole } = require('./middleware');
+const { Platform, Order, FeeRule } = require('./models');
+const { validId } = require('./access');
 
-module.exports = (pool) => {
-  // CREATE platform (owners only, e.g. seed Zomato, Swiggy once)
+// Case-insensitive exact match, e.g. "zomato" finds "Zomato"
+const sameName = (name) => ({ name: { $regex: `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+
+module.exports = () => {
+  // CREATE platform (owners only, e.g. Magicpin)
   router.post('/', requireAuth, requireRole('owner'), async (req, res) => {
     const name = req.body.name?.trim();
     if (!name) return res.status(400).json({ error: 'Name is required' });
     try {
-      const existing = await pool.query('SELECT id FROM platforms WHERE LOWER(name) = LOWER($1)', [name]);
-      if (existing.rows.length > 0) return res.status(409).json({ error: 'Platform already exists' });
-
-      const result = await pool.query('INSERT INTO platforms (name) VALUES ($1) RETURNING *', [name]);
-      res.status(201).json(result.rows[0]);
+      if (await Platform.findOne(sameName(name))) return res.status(409).json({ error: 'Platform already exists' });
+      const platform = await Platform.create({ name });
+      res.status(201).json(platform);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -21,8 +24,7 @@ module.exports = (pool) => {
   // GET all platforms
   router.get('/', requireAuth, async (req, res) => {
     try {
-      const result = await pool.query('SELECT * FROM platforms ORDER BY name');
-      res.json(result.rows);
+      res.json(await Platform.find().sort({ name: 1 }));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -33,9 +35,9 @@ module.exports = (pool) => {
     const name = req.body.name?.trim();
     if (!name) return res.status(400).json({ error: 'Name is required' });
     try {
-      const result = await pool.query('UPDATE platforms SET name = $1 WHERE id = $2 RETURNING *', [name, req.params.id]);
-      if (result.rows.length === 0) return res.status(404).json({ error: 'Platform not found' });
-      res.json(result.rows[0]);
+      const platform = validId(req.params.id) ? await Platform.findByIdAndUpdate(req.params.id, { name }, { returnDocument: 'after' }) : null;
+      if (!platform) return res.status(404).json({ error: 'Platform not found' });
+      res.json(platform);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -44,11 +46,13 @@ module.exports = (pool) => {
   // DELETE platform (owners only, blocked while orders use it)
   router.delete('/:id', requireAuth, requireRole('owner'), async (req, res) => {
     try {
-      const used = await pool.query('SELECT 1 FROM orders WHERE platform_id = $1 LIMIT 1', [req.params.id]);
-      if (used.rows.length > 0) return res.status(409).json({ error: 'Platform has orders and cannot be deleted' });
-
-      const result = await pool.query('DELETE FROM platforms WHERE id = $1 RETURNING *', [req.params.id]);
-      if (result.rows.length === 0) return res.status(404).json({ error: 'Platform not found' });
+      if (!validId(req.params.id)) return res.status(404).json({ error: 'Platform not found' });
+      if (await Order.exists({ platform_id: req.params.id })) {
+        return res.status(409).json({ error: 'Platform has orders and cannot be deleted' });
+      }
+      const platform = await Platform.findByIdAndDelete(req.params.id);
+      if (!platform) return res.status(404).json({ error: 'Platform not found' });
+      await FeeRule.deleteMany({ platform_id: platform._id });
       res.json({ deleted: true });
     } catch (err) {
       res.status(500).json({ error: err.message });

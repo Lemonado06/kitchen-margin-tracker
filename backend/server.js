@@ -1,49 +1,50 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
+const mongoose = require('mongoose');
+const { Platform } = require('./models');
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/kitchen_margin_tracker';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-
-const authRoutes = require('./auth');
-app.use('/auth', authRoutes(pool));
-
-const outletRoutes = require('./outlets');
-app.use('/outlets', outletRoutes(pool));
-
-const dishRoutes = require('./dishes');
-app.use('/dishes', dishRoutes(pool));
-
-const platformRoutes = require('./platforms');
-app.use('/platforms', platformRoutes(pool));
-
-const feeRuleRoutes = require('./feeRules');
-app.use('/fee-rules', feeRuleRoutes(pool));
-
-const recipeItemRoutes = require('./recipeItems');
-app.use('/recipe-items', recipeItemRoutes(pool));
-
-const orderRoutes = require('./orders');
-app.use('/orders', orderRoutes(pool));
-
-const dashboardRoutes = require('./dashboard');
-app.use('/dashboard', dashboardRoutes(pool));
-
-const aiRoutes = require('./ai');
-app.use('/ai', aiRoutes(pool));
+app.use('/auth', require('./auth')());
+app.use('/users', require('./users')());
+app.use('/outlets', require('./outlets')());
+app.use('/dishes', require('./dishes')());
+app.use('/platforms', require('./platforms')());
+app.use('/fee-rules', require('./feeRules')());
+app.use('/recipe-items', require('./recipeItems')());
+app.use('/orders', require('./orders')());
+app.use('/dashboard', require('./dashboard')());
+app.use('/ai', require('./ai')());
 
 app.get('/health', async (req, res) => {
   try {
-    const result = await pool.query('SELECT NOW()');
-    res.json({ status: 'ok', dbTime: result.rows[0] });
+    await mongoose.connection.db.admin().ping();
+    res.json({ status: 'ok', db: mongoose.connection.name, time: new Date() });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// The delivery platforms every outlet starts with
+async function ensureDefaultPlatforms() {
+  for (const name of ['Zomato', 'Swiggy', 'Direct']) {
+    await Platform.updateOne({ name }, { $setOnInsert: { name } }, { upsert: true });
+  }
+}
+
+async function start() {
+  await mongoose.connect(MONGODB_URI);
+  await ensureDefaultPlatforms();
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT} (MongoDB: ${mongoose.connection.name})`));
+}
+
+start().catch((err) => {
+  console.error('Failed to start:', err.message);
+  process.exit(1);
+});

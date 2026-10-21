@@ -2,33 +2,33 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
+const { User } = require('./models');
 
-const ALLOWED_ROLES = ['owner', 'manager'];
+function signToken(user) {
+  return jwt.sign({ id: user.id, role: user.role, name: user.name }, process.env.JWT_SECRET, { expiresIn: '7d' });
+}
 
-module.exports = (pool) => {
-  // REGISTER
+module.exports = () => {
+  // REGISTER: public sign-up creates an owner account; managers are added by an owner (see users.js)
   router.post('/register', async (req, res) => {
     const { name, email, password, role } = req.body;
-    if (!name || !email || !password || !role) {
+    if (!name || !email || !password) {
       return res.status(400).json({ error: 'All fields required' });
     }
-    if (!ALLOWED_ROLES.includes(role)) {
-      return res.status(400).json({ error: `Role must be one of: ${ALLOWED_ROLES.join(', ')}` });
+    if (role && role !== 'owner') {
+      return res.status(400).json({ error: 'Managers are added by an owner from the Team page' });
     }
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     try {
-      const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-      if (existing.rows.length > 0) {
+      const existing = await User.findOne({ email: email.toLowerCase().trim() });
+      if (existing) {
         return res.status(409).json({ error: 'Email already registered' });
       }
       const password_hash = await bcrypt.hash(password, 10);
-      const result = await pool.query(
-        'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
-        [name, email, password_hash, role]
-      );
-      res.status(201).json({ user: result.rows[0] });
+      const user = await User.create({ name, email, password_hash, role: 'owner' });
+      res.status(201).json({ user });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -41,21 +41,15 @@ module.exports = (pool) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
     try {
-      const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-      if (result.rows.length === 0) {
+      const user = await User.findOne({ email: email.toLowerCase().trim() });
+      if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
-      const user = result.rows[0];
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
-      const token = jwt.sign(
-        { id: user.id, role: user.role, name: user.name },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-      res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+      res.json({ token: signToken(user), user });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

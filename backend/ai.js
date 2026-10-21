@@ -3,6 +3,7 @@ const router = express.Router();
 const { GoogleGenAI } = require('@google/genai');
 const { requireAuth } = require('./middleware');
 const { marginByDish, marginByPlatform, discountImpact } = require('./aiTools');
+const { outletFor } = require('./access');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -28,12 +29,14 @@ async function sendWithRetry(chat, payload, retries = 3) {
   }
 }
 
-module.exports = (pool) => {
+module.exports = () => {
   router.post('/chat', requireAuth, async (req, res) => {
     const { message, outlet_id, filters } = req.body;
     if (!message || !outlet_id) return res.status(400).json({ error: 'message and outlet_id required' });
 
     try {
+      if (!(await outletFor(outlet_id, req.user))) return res.status(403).json({ error: 'You do not own this outlet' });
+
       const chat = ai.chats.create({
         model: 'gemini-3.8-flash',
         config: { tools: [{ functionDeclarations: toolDeclarations }] },
@@ -51,9 +54,9 @@ module.exports = (pool) => {
         console.log('Tool call requested:', call.name);
 
         let toolResult;
-        if (call.name === 'margin_by_dish') toolResult = await marginByDish(pool, outlet_id, filters || {});
-        else if (call.name === 'margin_by_platform') toolResult = await marginByPlatform(pool, outlet_id, filters || {});
-        else if (call.name === 'discount_impact') toolResult = await discountImpact(pool, outlet_id, filters || {});
+        if (call.name === 'margin_by_dish') toolResult = await marginByDish(outlet_id, filters || {});
+        else if (call.name === 'margin_by_platform') toolResult = await marginByPlatform(outlet_id, filters || {});
+        else if (call.name === 'discount_impact') toolResult = await discountImpact(outlet_id, filters || {});
 
         console.log('Tool result:', toolResult);
 

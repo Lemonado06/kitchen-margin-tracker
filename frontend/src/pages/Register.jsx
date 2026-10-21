@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../api/client';
+import api, { saveSession } from '../api/client';
+import AuthShell from '../components/AuthShell';
+import Icon from '../components/Icon';
+import { Button, ErrorText, Field, Input, PasswordInput } from '../components/ui';
 
 export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('owner');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   async function handleSubmit(e) {
@@ -17,63 +20,43 @@ export default function Register() {
       setError('Password must be at least 6 characters');
       return;
     }
+    setLoading(true);
     try {
-      await api.post('/auth/register', { name, email, password, role });
+      await api.post('/auth/register', { name, email, password });
       // auto-login after successful register
       const res = await api.post('/auth/login', { email, password });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      saveSession(res.data.token, res.data.user);
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
+      setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
-        <h1 className="text-2xl font-bold mb-6 text-gray-800">Create Account</h1>
-        {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-        <input
-          type="text"
-          placeholder="Full Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-2 mb-3"
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-2 mb-3"
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password (min 6 characters)"
-          minLength={6}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-2 mb-3"
-          required
-        />
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-2 mb-4"
-        >
-          <option value="owner">Owner</option>
-          <option value="manager">Manager</option>
-        </select>
-        <button type="submit" className="w-full bg-blue-600 text-white rounded py-2 font-medium hover:bg-blue-700">
-          Register
-        </button>
-        <p className="text-sm text-gray-500 mt-4 text-center">
-          Already have an account? <Link to="/login" className="text-blue-600">Login</Link>
+    <AuthShell title="Create your account" subtitle="Sign up as the kitchen owner. You can add managers later.">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <ErrorText>{error}</ErrorText>
+        <Field label="Full name">
+          <Input type="text" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        </Field>
+        <Field label="Email">
+          <Input type="email" placeholder="you@kitchen.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </Field>
+        <Field label="Password" hint="At least 6 characters">
+          <PasswordInput minLength={6} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </Field>
+        <div className="flex items-start gap-2 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3 text-xs text-cyan-100/80">
+          <Icon name="info" className="mt-0.5 w-4 h-4 shrink-0 text-cyan-300" />
+          Managers don't sign up here. Once you're in, add them from the Team page and they'll share your outlets.
+        </div>
+        <Button type="submit" size="lg" loading={loading} icon="arrowRight" className="w-full">
+          Create account
+        </Button>
+        <p className="pt-2 text-center text-sm text-slate-400">
+          Already have an account? <Link to="/login" className="font-semibold text-emerald-300 hover:text-emerald-200">Log in</Link>
         </p>
       </form>
-    </div>
+    </AuthShell>
   );
 }

@@ -2,23 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('./middleware');
 const { getMarginsData } = require('./aiTools');
+const { outletFor } = require('./access');
 
-module.exports = (pool) => {
-  async function verifyOutletOwnership(outletId, userId) {
-    const result = await pool.query('SELECT id FROM outlets WHERE id = $1 AND owner_id = $2', [outletId, userId]);
-    return result.rows.length > 0;
-  }
-
+module.exports = () => {
   router.get('/margins', requireAuth, async (req, res) => {
     const { outlet_id, platform_id, dish_id, date_from, date_to } = req.query;
     if (!outlet_id) return res.status(400).json({ error: 'outlet_id is required' });
 
-    const owns = await verifyOutletOwnership(outlet_id, req.user.id);
-    if (!owns) return res.status(403).json({ error: 'You do not own this outlet' });
-
     try {
+      if (!(await outletFor(outlet_id, req.user))) return res.status(403).json({ error: 'You do not own this outlet' });
+
       // Profit per order (shared with the AI tools so both always agree)
-      const rows = await getMarginsData(pool, outlet_id, { platform_id, dish_id, date_from, date_to });
+      const rows = await getMarginsData(outlet_id, { platform_id, dish_id, date_from, date_to });
 
       // KPIs
       const totalRevenue = rows.reduce((s, r) => s + r.orderValue, 0);
@@ -41,9 +36,7 @@ module.exports = (pool) => {
       // Group by date (for trend line)
       const byDate = {};
       rows.forEach(r => {
-        // pg returns DATE as local midnight; toISOString() would shift it a day back in IST
-        const d = new Date(r.order_date);
-        const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const date = r.order_date; // already YYYY-MM-DD
         if (!byDate[date]) byDate[date] = { date, revenue: 0, profit: 0 };
         byDate[date].revenue += r.orderValue;
         byDate[date].profit += r.profit;
