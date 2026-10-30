@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Kitchen Margin Tracker API",
-    "description": "All REST endpoints of the Kitchen Margin Tracker backend (Express + MongoDB).\n\nRun the whole collection in order (Collection Runner) against a running backend. Each run registers a fresh owner using `runId`, adds a manager, exercises every route with tests, then cleans up.",
+    "description": "All REST endpoints of the Kitchen Margin Tracker backend (Express + MongoDB + Gemini).\n\n**How to run:** import this collection and the `Kitchen Margin Tracker - Local` environment, start the backend (`npm run dev` in backend/),\nselect the environment and run the whole collection in the Collection Runner. Each run registers a fresh owner (via `runId`),\nsaves the JWT automatically, adds a manager, checks every role rule and the margin maths, asks the AI assistant, then cleans up.\n\nEvery request has tests and a saved example response.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -78,7 +78,8 @@
               "path": [
                 "health"
               ]
-            }
+            },
+            "description": "Returns {status: \"ok\"} when MongoDB is reachable."
           },
           "event": [
             {
@@ -91,9 +92,39 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/health",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
+                },
+                "description": "Returns {status: \"ok\"} when MongoDB is reachable."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"db\": \"kmt_test\",\n  \"time\": \"2026-10-30T11:00:07.927Z\"\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "Checks the API is up and MongoDB answers a ping. No login needed."
     },
     {
       "name": "1. Auth",
@@ -126,7 +157,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Creates an owner account. Uses {{runId}} so every run gets a fresh email."
           },
           "event": [
             {
@@ -139,6 +171,50 @@
                   "pm.test('No password hash returned', () => pm.expect(pm.response.json().user).to.not.have.property('password_hash'));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "register"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Owner\",\n  \"email\": \"owner{{runId}}@test.com\",\n  \"password\": \"secret123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Creates an owner account. Uses {{runId}} so every run gets a fresh email."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"user\": {\n    \"name\": \"Postman Owner\",\n    \"email\": \"owner1793358007846@test.com\",\n    \"role\": \"owner\",\n    \"created_at\": \"2026-10-30T11:00:08.137Z\",\n    \"id\": \"6ae478b815d67e884047a56c\"\n  }\n}"
             }
           ]
         },
@@ -183,6 +259,50 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "register"
+                  ]
+                },
+                "description": "Managers can only be added by an owner from the Team page.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Sneaky\",\n  \"email\": \"sneaky{{runId}}@test.com\",\n  \"password\": \"secret123\",\n  \"role\": \"manager\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Managers are added by an owner from the Team page\"\n}"
+            }
           ]
         },
         {
@@ -213,7 +333,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Emails are unique (case-insensitive)."
           },
           "event": [
             {
@@ -224,6 +345,50 @@
                   "pm.test('Status is 409', () => pm.response.to.have.status(409));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "409 Conflict",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "register"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Owner\",\n  \"email\": \"owner{{runId}}@test.com\",\n  \"password\": \"secret123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Emails are unique (case-insensitive)."
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Email already registered\"\n}"
             }
           ]
         },
@@ -255,7 +420,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Wrong credentials return 401 without saying which part was wrong."
           },
           "event": [
             {
@@ -266,6 +432,50 @@
                   "pm.test('Status is 401', () => pm.response.to.have.status(401));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"owner{{runId}}@test.com\",\n  \"password\": \"wrong-pass\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Wrong credentials return 401 without saying which part was wrong."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Invalid credentials\"\n}"
             }
           ]
         },
@@ -312,6 +522,50 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "description": "Saves the JWT into the `token` collection variable; later requests send it as a Bearer token.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"owner{{runId}}@test.com\",\n  \"password\": \"secret123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"token\": \"<jwt>\",\n  \"user\": {\n    \"name\": \"Postman Owner\",\n    \"email\": \"owner1793358007846@test.com\",\n    \"role\": \"owner\",\n    \"created_at\": \"2026-10-30T11:00:08.137Z\",\n    \"id\": \"6ae478b815d67e884047a56c\"\n  }\n}"
+            }
           ]
         },
         {
@@ -327,7 +581,8 @@
               "path": [
                 "outlets"
               ]
-            }
+            },
+            "description": "Every route except /auth and /health needs a Bearer token."
           },
           "event": [
             {
@@ -339,9 +594,39 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets"
+                  ]
+                },
+                "description": "Every route except /auth and /health needs a Bearer token."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"No token provided\"\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "Owner sign-up and login. Login saves the JWT into the `token` collection variable; every later request sends it as `Authorization: Bearer {{token}}`."
     },
     {
       "name": "2. Users & roles",
@@ -365,7 +650,8 @@
                 "users",
                 "me"
               ]
-            }
+            },
+            "description": "The logged-in user; managers also get owner_name."
           },
           "event": [
             {
@@ -377,6 +663,41 @@
                   "pm.test('Owner role', () => pm.expect(pm.response.json().role).to.eql('owner'));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "me"
+                  ]
+                },
+                "description": "The logged-in user; managers also get owner_name."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"name\": \"Postman Owner\",\n  \"email\": \"owner1793358007846@test.com\",\n  \"role\": \"owner\",\n  \"created_at\": \"2026-10-30T11:00:08.137Z\",\n  \"id\": \"6ae478b815d67e884047a56c\",\n  \"owner_name\": null\n}"
             }
           ]
         },
@@ -412,7 +733,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Change your own name."
           },
           "event": [
             {
@@ -424,6 +746,54 @@
                   "pm.test('Name updated', () => pm.expect(pm.response.json().name).to.eql('Postman Owner (edited)'));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Owner (edited)\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Change your own name."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"name\": \"Postman Owner (edited)\",\n  \"email\": \"owner1793358007846@test.com\",\n  \"role\": \"owner\",\n  \"created_at\": \"2026-10-30T11:00:08.137Z\",\n  \"id\": \"6ae478b815d67e884047a56c\"\n}"
             }
           ]
         },
@@ -459,7 +829,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "A new password needs the current one."
           },
           "event": [
             {
@@ -470,6 +841,54 @@
                   "pm.test('Status is 400', () => pm.response.to.have.status(400));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Owner (edited)\",\n  \"current_password\": \"nope\",\n  \"new_password\": \"newsecret123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "A new password needs the current one."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Current password is incorrect\"\n}"
             }
           ]
         },
@@ -504,7 +923,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Owner-only. Creates a manager linked to this owner and saves managerId."
           },
           "event": [
             {
@@ -517,6 +937,53 @@
                   "pm.collectionVariables.set('managerId', pm.response.json().id);"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Manager\",\n  \"email\": \"manager{{runId}}@test.com\",\n  \"password\": \"secret123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Owner-only. Creates a manager linked to this owner and saves managerId."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"name\": \"Postman Manager\",\n  \"email\": \"manager1793358007846@test.com\",\n  \"role\": \"manager\",\n  \"owner_id\": \"6ae478b815d67e884047a56c\",\n  \"created_at\": \"2026-10-30T11:00:09.376Z\",\n  \"id\": \"6ae478b915d67e884047a56d\"\n}"
             }
           ]
         },
@@ -538,7 +1005,8 @@
               "path": [
                 "users"
               ]
-            }
+            },
+            "description": "Owner-only. The owner plus their managers."
           },
           "event": [
             {
@@ -550,6 +1018,40 @@
                   "pm.test('Owner + manager', () => pm.expect(pm.response.json().length).to.eql(2));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users"
+                  ]
+                },
+                "description": "Owner-only. The owner plus their managers."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"name\": \"Postman Owner (edited)\",\n    \"email\": \"owner1793358007846@test.com\",\n    \"role\": \"owner\",\n    \"created_at\": \"2026-10-30T11:00:08.137Z\",\n    \"id\": \"6ae478b815d67e884047a56c\"\n  },\n  {\n    \"name\": \"Postman Manager\",\n    \"email\": \"manager1793358007846@test.com\",\n    \"role\": \"manager\",\n    \"owner_id\": \"6ae478b815d67e884047a56c\",\n    \"created_at\": \"2026-10-30T11:00:09.376Z\",\n    \"id\": \"6ae478b915d67e884047a56d\"\n  }\n]"
             }
           ]
         },
@@ -585,7 +1087,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Owner-only. Rename a manager or set a new password for them."
           },
           "event": [
             {
@@ -596,6 +1099,54 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/{{managerId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "{{managerId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Manager\",\n  \"password\": \"managerpass1\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Owner-only. Rename a manager or set a new password for them."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"name\": \"Postman Manager\",\n  \"email\": \"manager1793358007846@test.com\",\n  \"role\": \"manager\",\n  \"owner_id\": \"6ae478b815d67e884047a56c\",\n  \"created_at\": \"2026-10-30T11:00:09.376Z\",\n  \"id\": \"6ae478b915d67e884047a56d\"\n}"
             }
           ]
         },
@@ -627,7 +1178,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Saves managerToken for the role checks that follow."
           },
           "event": [
             {
@@ -639,6 +1191,50 @@
                   "pm.collectionVariables.set('managerToken', pm.response.json().token);"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "login"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"manager{{runId}}@test.com\",\n  \"password\": \"managerpass1\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Saves managerToken for the role checks that follow."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"token\": \"<jwt>\",\n  \"user\": {\n    \"name\": \"Postman Manager\",\n    \"email\": \"manager1793358007846@test.com\",\n    \"role\": \"manager\",\n    \"owner_id\": \"6ae478b815d67e884047a56c\",\n    \"created_at\": \"2026-10-30T11:00:09.376Z\",\n    \"id\": \"6ae478b915d67e884047a56d\"\n  }\n}"
             }
           ]
         },
@@ -660,7 +1256,8 @@
               "path": [
                 "users"
               ]
-            }
+            },
+            "description": "Managers get 403 on team management."
           },
           "event": [
             {
@@ -671,6 +1268,40 @@
                   "pm.test('Status is 403', () => pm.response.to.have.status(403));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users"
+                  ]
+                },
+                "description": "Managers get 403 on team management."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Insufficient permissions\"\n}"
             }
           ]
         },
@@ -705,7 +1336,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Managers get 403 on team management."
           },
           "event": [
             {
@@ -717,10 +1349,57 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"X\",\n  \"email\": \"x{{runId}}@test.com\",\n  \"password\": \"secret123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Managers get 403 on team management."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Insufficient permissions\"\n}"
+            }
           ]
         }
       ],
-      "description": "Owners sign up; owners add managers. Managers work on the owner's outlets but cannot delete records or manage the team."
+      "description": "Owners add managers; managers share the owner's outlets but cannot delete records, manage platforms or manage the team. These requests check both sides of every rule."
     },
     {
       "name": "3. Platforms",
@@ -743,7 +1422,8 @@
               "path": [
                 "platforms"
               ]
-            }
+            },
+            "description": "All platforms; saves the Zomato id as platformId."
           },
           "event": [
             {
@@ -757,6 +1437,40 @@
                   "pm.collectionVariables.set('platformId', z.id);"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/platforms",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "platforms"
+                  ]
+                },
+                "description": "All platforms; saves the Zomato id as platformId."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"name\": \"Direct\",\n    \"created_at\": \"2026-10-30T10:40:55.297Z\",\n    \"id\": \"6ae47437e84cfb86ea3bffbd\"\n  },\n  {\n    \"name\": \"Swiggy\",\n    \"created_at\": \"2026-10-30T10:40:55.295Z\",\n    \"id\": \"6ae47437e84cfb86ea3bffbc\"\n  },\n  {\n    \"name\": \"Zomato\",\n    \"created_at\": \"2026-10-30T10:40:55.292Z\",\n    \"id\": \"6ae47437e84cfb86ea3bffbb\"\n  }\n]"
             }
           ]
         },
@@ -791,7 +1505,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Owner-only."
           },
           "event": [
             {
@@ -803,6 +1518,53 @@
                   "pm.collectionVariables.set('newPlatformId', pm.response.json().id);"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/platforms",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "platforms"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Magicpin {{runId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Owner-only."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"name\": \"Magicpin 1793358007846\",\n  \"created_at\": \"2026-10-30T11:00:10.338Z\",\n  \"id\": \"6ae478ba15d67e884047a56e\"\n}"
             }
           ]
         },
@@ -837,7 +1599,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Names are unique regardless of case."
           },
           "event": [
             {
@@ -848,6 +1611,53 @@
                   "pm.test('Status is 409', () => pm.response.to.have.status(409));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "409 Conflict",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/platforms",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "platforms"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"magicpin {{runId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Names are unique regardless of case."
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Platform already exists\"\n}"
             }
           ]
         },
@@ -882,7 +1692,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Managers get 403."
           },
           "event": [
             {
@@ -893,6 +1704,53 @@
                   "pm.test('Status is 403', () => pm.response.to.have.status(403));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/platforms",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "platforms"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Nope {{runId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Managers get 403."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Insufficient permissions\"\n}"
             }
           ]
         },
@@ -928,7 +1786,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Owner-only."
           },
           "event": [
             {
@@ -939,6 +1798,54 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/platforms/{{newPlatformId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "platforms",
+                    "{{newPlatformId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Magicpin Plus {{runId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Owner-only."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"name\": \"Magicpin Plus 1793358007846\",\n  \"created_at\": \"2026-10-30T11:00:10.338Z\",\n  \"id\": \"6ae478ba15d67e884047a56e\"\n}"
             }
           ]
         },
@@ -961,7 +1868,8 @@
                 "platforms",
                 "{{newPlatformId}}"
               ]
-            }
+            },
+            "description": "Owner-only; blocked (409) while orders use the platform."
           },
           "event": [
             {
@@ -973,9 +1881,45 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/platforms/{{newPlatformId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "platforms",
+                    "{{newPlatformId}}"
+                  ]
+                },
+                "description": "Owner-only; blocked (409) while orders use the platform."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"deleted\": true\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "Delivery platforms (Zomato, Swiggy, Direct are created on first start). Only owners can add, rename or delete them."
     },
     {
       "name": "4. Outlets",
@@ -1011,7 +1955,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Saved under the account owner so managers share it. Saves outletId."
           },
           "event": [
             {
@@ -1023,6 +1968,53 @@
                   "pm.collectionVariables.set('outletId', pm.response.json().id);"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Kitchen\",\n  \"city\": \"Bengaluru\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Saved under the account owner so managers share it. Saves outletId."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"owner_id\": \"6ae478b815d67e884047a56c\",\n  \"name\": \"Postman Kitchen\",\n  \"city\": \"Bengaluru\",\n  \"created_at\": \"2026-10-30T11:00:10.828Z\",\n  \"id\": \"6ae478ba15d67e884047a56f\"\n}"
             }
           ]
         },
@@ -1044,7 +2036,8 @@
               "path": [
                 "outlets"
               ]
-            }
+            },
+            "description": "Newest first."
           },
           "event": [
             {
@@ -1056,6 +2049,40 @@
                   "pm.test('Has the new outlet', () => pm.expect(pm.response.json().map(o => o.id)).to.include(pm.collectionVariables.get('outletId')));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets"
+                  ]
+                },
+                "description": "Newest first."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"owner_id\": \"6ae478b815d67e884047a56c\",\n    \"name\": \"Postman Kitchen\",\n    \"city\": \"Bengaluru\",\n    \"created_at\": \"2026-10-30T11:00:10.828Z\",\n    \"id\": \"6ae478ba15d67e884047a56f\"\n  }\n]"
             }
           ]
         },
@@ -1077,7 +2104,8 @@
               "path": [
                 "outlets"
               ]
-            }
+            },
+            "description": "Managers work on their owner's outlets."
           },
           "event": [
             {
@@ -1089,6 +2117,40 @@
                   "pm.test('Shared outlet', () => pm.expect(pm.response.json().map(o => o.id)).to.include(pm.collectionVariables.get('outletId')));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets"
+                  ]
+                },
+                "description": "Managers work on their owner's outlets."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"owner_id\": \"6ae478b815d67e884047a56c\",\n    \"name\": \"Postman Kitchen\",\n    \"city\": \"Bengaluru\",\n    \"created_at\": \"2026-10-30T11:00:10.828Z\",\n    \"id\": \"6ae478ba15d67e884047a56f\"\n  }\n]"
             }
           ]
         },
@@ -1124,7 +2186,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Change name or city."
           },
           "event": [
             {
@@ -1136,6 +2199,54 @@
                   "pm.test('City updated', () => pm.expect(pm.response.json().city).to.eql('Mysuru'));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets/{{outletId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets",
+                    "{{outletId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Kitchen\",\n  \"city\": \"Mysuru\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Change name or city."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"owner_id\": \"6ae478b815d67e884047a56c\",\n  \"name\": \"Postman Kitchen\",\n  \"city\": \"Mysuru\",\n  \"created_at\": \"2026-10-30T11:00:10.828Z\",\n  \"id\": \"6ae478ba15d67e884047a56f\"\n}"
             }
           ]
         },
@@ -1171,7 +2282,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Malformed ids return 404, not a server error."
           },
           "event": [
             {
@@ -1183,9 +2295,58 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets/not-an-id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets",
+                    "not-an-id"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"X\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Malformed ids return 404, not a server error."
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Outlet not found\"\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "CRUD for outlets. Managers see and edit their owner's outlets."
     },
     {
       "name": "5. Dishes & recipe costs",
@@ -1221,7 +2382,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Saves dishId."
           },
           "event": [
             {
@@ -1233,6 +2395,53 @@
                   "pm.collectionVariables.set('dishId', pm.response.json().id);"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/dishes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "dishes"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"name\": \"Masala Dosa\",\n  \"price\": 120\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Saves dishId."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n  \"name\": \"Masala Dosa\",\n  \"price\": 120,\n  \"created_at\": \"2026-10-30T11:00:11.320Z\",\n  \"id\": \"6ae478bb15d67e884047a570\"\n}"
             }
           ]
         },
@@ -1267,7 +2476,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Price must be positive."
           },
           "event": [
             {
@@ -1278,6 +2488,53 @@
                   "pm.test('Status is 400', () => pm.response.to.have.status(400));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/dishes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "dishes"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"name\": \"Bad\",\n  \"price\": -5\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Price must be positive."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Price must be a positive number\"\n}"
             }
           ]
         },
@@ -1301,7 +2558,8 @@
                 "outlet",
                 "{{outletId}}"
               ]
-            }
+            },
+            "description": "Dishes of one outlet."
           },
           "event": [
             {
@@ -1313,6 +2571,42 @@
                   "pm.test('One dish', () => pm.expect(pm.response.json().length).to.eql(1));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/dishes/outlet/{{outletId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "dishes",
+                    "outlet",
+                    "{{outletId}}"
+                  ]
+                },
+                "description": "Dishes of one outlet."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n    \"name\": \"Masala Dosa\",\n    \"price\": 120,\n    \"created_at\": \"2026-10-30T11:00:11.320Z\",\n    \"id\": \"6ae478bb15d67e884047a570\"\n  }\n]"
             }
           ]
         },
@@ -1348,7 +2642,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Change name or price."
           },
           "event": [
             {
@@ -1359,6 +2654,54 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/dishes/{{dishId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "dishes",
+                    "{{dishId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Masala Dosa\",\n  \"price\": 130\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Change name or price."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n  \"name\": \"Masala Dosa\",\n  \"price\": 130,\n  \"created_at\": \"2026-10-30T11:00:11.320Z\",\n  \"id\": \"6ae478bb15d67e884047a570\"\n}"
             }
           ]
         },
@@ -1393,7 +2736,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "An ingredient and its cost; saves recipeItemId."
           },
           "event": [
             {
@@ -1405,6 +2749,53 @@
                   "pm.collectionVariables.set('recipeItemId', pm.response.json().id);"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/recipe-items",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "recipe-items"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dish_id\": \"{{dishId}}\",\n  \"ingredient_name\": \"Batter\",\n  \"cost\": 25\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "An ingredient and its cost; saves recipeItemId."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"dish_id\": \"6ae478bb15d67e884047a570\",\n  \"ingredient_name\": \"Batter\",\n  \"cost\": 25,\n  \"created_at\": \"2026-10-30T11:00:11.694Z\",\n  \"id\": \"6ae478bb15d67e884047a571\"\n}"
             }
           ]
         },
@@ -1439,7 +2830,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Managers can add and edit."
           },
           "event": [
             {
@@ -1450,6 +2842,53 @@
                   "pm.test('Status is 201', () => pm.response.to.have.status(201));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/recipe-items",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "recipe-items"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dish_id\": \"{{dishId}}\",\n  \"ingredient_name\": \"Potato masala\",\n  \"cost\": 15\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Managers can add and edit."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"dish_id\": \"6ae478bb15d67e884047a570\",\n  \"ingredient_name\": \"Potato masala\",\n  \"cost\": 15,\n  \"created_at\": \"2026-10-30T11:00:11.794Z\",\n  \"id\": \"6ae478bb15d67e884047a572\"\n}"
             }
           ]
         },
@@ -1473,7 +2912,8 @@
                 "dish",
                 "{{dishId}}"
               ]
-            }
+            },
+            "description": "Ingredients of one dish, A to Z."
           },
           "event": [
             {
@@ -1485,6 +2925,42 @@
                   "pm.test('Two items', () => pm.expect(pm.response.json().length).to.eql(2));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/recipe-items/dish/{{dishId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "recipe-items",
+                    "dish",
+                    "{{dishId}}"
+                  ]
+                },
+                "description": "Ingredients of one dish, A to Z."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"dish_id\": \"6ae478bb15d67e884047a570\",\n    \"ingredient_name\": \"Batter\",\n    \"cost\": 25,\n    \"created_at\": \"2026-10-30T11:00:11.694Z\",\n    \"id\": \"6ae478bb15d67e884047a571\"\n  },\n  {\n    \"dish_id\": \"6ae478bb15d67e884047a570\",\n    \"ingredient_name\": \"Potato masala\",\n    \"cost\": 15,\n    \"created_at\": \"2026-10-30T11:00:11.794Z\",\n    \"id\": \"6ae478bb15d67e884047a572\"\n  }\n]"
             }
           ]
         },
@@ -1520,7 +2996,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Change ingredient name or cost."
           },
           "event": [
             {
@@ -1531,6 +3008,54 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/recipe-items/{{recipeItemId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "recipe-items",
+                    "{{recipeItemId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ingredient_name\": \"Batter\",\n  \"cost\": 20\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Change ingredient name or cost."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"dish_id\": \"6ae478bb15d67e884047a570\",\n  \"ingredient_name\": \"Batter\",\n  \"cost\": 20,\n  \"created_at\": \"2026-10-30T11:00:11.694Z\",\n  \"id\": \"6ae478bb15d67e884047a571\"\n}"
             }
           ]
         },
@@ -1553,7 +3078,8 @@
                 "recipe-items",
                 "{{recipeItemId}}"
               ]
-            }
+            },
+            "description": "Deleting is owner-only."
           },
           "event": [
             {
@@ -1565,9 +3091,45 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/recipe-items/{{recipeItemId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "recipe-items",
+                    "{{recipeItemId}}"
+                  ]
+                },
+                "description": "Deleting is owner-only."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Insufficient permissions\"\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "Dishes with menu prices, and recipe items whose costs add up to each dish's food cost."
     },
     {
       "name": "6. Fee rules",
@@ -1603,7 +3165,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Commission + GST for a platform at this outlet; saves ruleId."
           },
           "event": [
             {
@@ -1615,6 +3178,53 @@
                   "pm.collectionVariables.set('ruleId', pm.response.json().id);"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/fee-rules",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "fee-rules"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"platform_id\": \"{{platformId}}\",\n  \"commission_pct\": 25,\n  \"gst_on_commission_pct\": 18\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Commission + GST for a platform at this outlet; saves ruleId."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n  \"platform_id\": \"6ae47437e84cfb86ea3bffbb\",\n  \"commission_pct\": 25,\n  \"gst_on_commission_pct\": 18,\n  \"effective_from\": \"2026-10-30T11:00:12.193Z\",\n  \"created_at\": \"2026-10-30T11:00:12.194Z\",\n  \"id\": \"6ae478bc15d67e884047a573\"\n}"
             }
           ]
         },
@@ -1649,7 +3259,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "One rule per platform per outlet (409)."
           },
           "event": [
             {
@@ -1660,6 +3271,53 @@
                   "pm.test('Status is 409', () => pm.response.to.have.status(409));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "409 Conflict",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/fee-rules",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "fee-rules"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"platform_id\": \"{{platformId}}\",\n  \"commission_pct\": 10\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "One rule per platform per outlet (409)."
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"A fee rule for this platform already exists. Edit it instead.\"\n}"
             }
           ]
         },
@@ -1694,7 +3352,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Percentages must be 0 to 100."
           },
           "event": [
             {
@@ -1705,6 +3364,53 @@
                   "pm.test('Status is 400', () => pm.response.to.have.status(400));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/fee-rules",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "fee-rules"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"platform_id\": \"{{platformId}}\",\n  \"commission_pct\": 120\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Percentages must be 0 to 100."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Percentages must be between 0 and 100\"\n}"
             }
           ]
         },
@@ -1728,7 +3434,8 @@
                 "outlet",
                 "{{outletId}}"
               ]
-            }
+            },
+            "description": "Includes platform_name."
           },
           "event": [
             {
@@ -1740,6 +3447,42 @@
                   "pm.test('Platform name included', () => pm.expect(pm.response.json()[0].platform_name).to.eql('Zomato'));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/fee-rules/outlet/{{outletId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "fee-rules",
+                    "outlet",
+                    "{{outletId}}"
+                  ]
+                },
+                "description": "Includes platform_name."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n    \"platform_id\": \"6ae47437e84cfb86ea3bffbb\",\n    \"commission_pct\": 25,\n    \"gst_on_commission_pct\": 18,\n    \"effective_from\": \"2026-10-30T11:00:12.193Z\",\n    \"created_at\": \"2026-10-30T11:00:12.194Z\",\n    \"id\": \"6ae478bc15d67e884047a573\",\n    \"platform_name\": \"Zomato\"\n  }\n]"
             }
           ]
         },
@@ -1775,7 +3518,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Change commission or GST."
           },
           "event": [
             {
@@ -1787,9 +3531,58 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/fee-rules/{{ruleId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "fee-rules",
+                    "{{ruleId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"commission_pct\": 20,\n  \"gst_on_commission_pct\": 18\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Change commission or GST."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n  \"platform_id\": \"6ae47437e84cfb86ea3bffbb\",\n  \"commission_pct\": 20,\n  \"gst_on_commission_pct\": 18,\n  \"effective_from\": \"2026-10-30T11:00:12.193Z\",\n  \"created_at\": \"2026-10-30T11:00:12.194Z\",\n  \"id\": \"6ae478bc15d67e884047a573\"\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "Commission % and GST on commission % for each platform, per outlet. One rule per platform per outlet."
     },
     {
       "name": "7. Orders",
@@ -1825,7 +3618,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Saves orderId. order_date comes back as YYYY-MM-DD."
           },
           "event": [
             {
@@ -1838,6 +3632,53 @@
                   "pm.test('Date kept as YYYY-MM-DD', () => pm.expect(pm.response.json().order_date).to.eql('2026-10-01'));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"dish_id\": \"{{dishId}}\",\n  \"platform_id\": \"{{platformId}}\",\n  \"order_date\": \"2026-10-01\",\n  \"order_value\": 260,\n  \"discount_amount\": 20,\n  \"packaging_cost\": 10\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Saves orderId. order_date comes back as YYYY-MM-DD."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n  \"platform_id\": \"6ae47437e84cfb86ea3bffbb\",\n  \"dish_id\": \"6ae478bb15d67e884047a570\",\n  \"order_date\": \"2026-10-01\",\n  \"order_value\": 260,\n  \"discount_amount\": 20,\n  \"packaging_cost\": 10,\n  \"created_at\": \"2026-10-30T11:00:12.687Z\",\n  \"id\": \"6ae478bc15d67e884047a574\"\n}"
             }
           ]
         },
@@ -1872,7 +3713,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Managers can record orders."
           },
           "event": [
             {
@@ -1883,6 +3725,53 @@
                   "pm.test('Status is 201', () => pm.response.to.have.status(201));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"dish_id\": \"{{dishId}}\",\n  \"platform_id\": \"{{platformId}}\",\n  \"order_date\": \"2026-10-02\",\n  \"order_value\": 130\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Managers can record orders."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n  \"platform_id\": \"6ae47437e84cfb86ea3bffbb\",\n  \"dish_id\": \"6ae478bb15d67e884047a570\",\n  \"order_date\": \"2026-10-02\",\n  \"order_value\": 130,\n  \"discount_amount\": 0,\n  \"packaging_cost\": 0,\n  \"created_at\": \"2026-10-30T11:00:12.789Z\",\n  \"id\": \"6ae478bc15d67e884047a575\"\n}"
             }
           ]
         },
@@ -1917,7 +3806,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "The dish must belong to the same outlet."
           },
           "event": [
             {
@@ -1928,6 +3818,53 @@
                   "pm.test('Status is 400', () => pm.response.to.have.status(400));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"dish_id\": \"{{platformId}}\",\n  \"platform_id\": \"{{platformId}}\",\n  \"order_date\": \"2026-10-01\",\n  \"order_value\": 100\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "The dish must belong to the same outlet."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Dish not found for this outlet\"\n}"
             }
           ]
         },
@@ -1951,7 +3888,8 @@
                 "outlet",
                 "{{outletId}}"
               ]
-            }
+            },
+            "description": "Newest first, with dish_name and platform_name."
           },
           "event": [
             {
@@ -1963,6 +3901,42 @@
                   "pm.test('Two orders, newest first', () => { const o = pm.response.json(); pm.expect(o.length).to.eql(2); pm.expect(o[0].order_date).to.eql('2026-10-02'); pm.expect(o[0].dish_name).to.eql('Masala Dosa'); });"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders/outlet/{{outletId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "outlet",
+                    "{{outletId}}"
+                  ]
+                },
+                "description": "Newest first, with dish_name and platform_name."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "[\n  {\n    \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n    \"platform_id\": \"6ae47437e84cfb86ea3bffbb\",\n    \"dish_id\": \"6ae478bb15d67e884047a570\",\n    \"order_date\": \"2026-10-02\",\n    \"order_value\": 130,\n    \"discount_amount\": 0,\n    \"packaging_cost\": 0,\n    \"created_at\": \"2026-10-30T11:00:12.789Z\",\n    \"id\": \"6ae478bc15d67e884047a575\",\n    \"dish_name\": \"Masala Dosa\",\n    \"platform_name\": \"Zomato\"\n  },\n  {\n    \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n    \"platform_id\": \"6ae47437e84cfb86ea3bffbb\",\n    \"dish_id\": \"6ae478bb15d67e884047a570\",\n    \"order_date\": \"2026-10-01\",\n    \"order_value\": 260,\n    \"discount_amount\": 20,\n    \"packaging_cost\": 10,\n    \"created_at\": \"2026-10-30T11:00:12.687Z\",\n    \"id\": \"6ae478bc15d67e884047a574\",\n    \"dish_name\": \"Masala Dosa\",\n    \"platform_name\": \"Zomato\"\n  }\n]"
             }
           ]
         },
@@ -1998,7 +3972,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "Change any order field."
           },
           "event": [
             {
@@ -2009,6 +3984,54 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders/{{orderId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "{{orderId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dish_id\": \"{{dishId}}\",\n  \"platform_id\": \"{{platformId}}\",\n  \"order_date\": \"2026-10-01\",\n  \"order_value\": 260,\n  \"discount_amount\": 0,\n  \"packaging_cost\": 10\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Change any order field."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"outlet_id\": \"6ae478ba15d67e884047a56f\",\n  \"platform_id\": \"6ae47437e84cfb86ea3bffbb\",\n  \"dish_id\": \"6ae478bb15d67e884047a570\",\n  \"order_date\": \"2026-10-01\",\n  \"order_value\": 260,\n  \"discount_amount\": 0,\n  \"packaging_cost\": 10,\n  \"created_at\": \"2026-10-30T11:00:12.687Z\",\n  \"id\": \"6ae478bc15d67e884047a574\"\n}"
             }
           ]
         },
@@ -2031,7 +4054,8 @@
                 "orders",
                 "{{orderId}}"
               ]
-            }
+            },
+            "description": "Deleting is owner-only."
           },
           "event": [
             {
@@ -2043,9 +4067,45 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders/{{orderId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "{{orderId}}"
+                  ]
+                },
+                "description": "Deleting is owner-only."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Insufficient permissions\"\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "Orders with platform, dish, date, value, discount and packaging cost. Dates are stored and returned as YYYY-MM-DD."
     },
     {
       "name": "8. Dashboard",
@@ -2075,7 +4135,8 @@
                   "value": "{{outletId}}"
                 }
               ]
-            }
+            },
+            "description": "Checks the margin maths: 260 − 20% commission − 18% GST − ₹10 packaging − ₹35 food cost, plus the manager's ₹130 order."
           },
           "event": [
             {
@@ -2090,6 +4151,47 @@
                   "pm.test('Profit matches the fee + food cost maths', () => pm.expect(k.totalProfit).to.be.closeTo(217.96, 0.01));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/dashboard/margins?outlet_id={{outletId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "margins"
+                  ],
+                  "query": [
+                    {
+                      "key": "outlet_id",
+                      "value": "{{outletId}}"
+                    }
+                  ]
+                },
+                "description": "Checks the margin maths: 260 − 20% commission − 18% GST − ₹10 packaging − ₹35 food cost, plus the manager's ₹130 order."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"kpis\": {\n    \"totalRevenue\": 390,\n    \"totalProfit\": 217.95999999999998,\n    \"marginPct\": 55.88717948717948,\n    \"orderCount\": 2\n  },\n  \"dishBreakdown\": [\n    {\n      \"dish_name\": \"Masala Dosa\",\n      \"revenue\": 390,\n      \"profit\": 217.95999999999998,\n      \"orders\": 2,\n      \"marginPct\": 55.88717948717948\n    }\n  ],\n  \"trend\": [\n    {\n      \"date\": \"2026-10-01\",\n      \"revenue\": 260,\n      \"profit\": 153.64\n    },\n    {\n      \"date\": \"2026-10-02\",\n      \"revenue\": 130,\n      \"profit\": 64.32\n    }\n  ]\n}"
             }
           ]
         },
@@ -2126,7 +4228,8 @@
                   "value": "2026-10-02"
                 }
               ]
-            }
+            },
+            "description": "date_from / date_to narrow the orders."
           },
           "event": [
             {
@@ -2139,15 +4242,155 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/dashboard/margins?outlet_id={{outletId}}&date_from=2026-10-02&date_to=2026-10-02",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "margins"
+                  ],
+                  "query": [
+                    {
+                      "key": "outlet_id",
+                      "value": "{{outletId}}"
+                    },
+                    {
+                      "key": "date_from",
+                      "value": "2026-10-02"
+                    },
+                    {
+                      "key": "date_to",
+                      "value": "2026-10-02"
+                    }
+                  ]
+                },
+                "description": "date_from / date_to narrow the orders."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"kpis\": {\n    \"totalRevenue\": 130,\n    \"totalProfit\": 64.32,\n    \"marginPct\": 49.47692307692307,\n    \"orderCount\": 1\n  },\n  \"dishBreakdown\": [\n    {\n      \"dish_name\": \"Masala Dosa\",\n      \"revenue\": 130,\n      \"profit\": 64.32,\n      \"orders\": 1,\n      \"marginPct\": 49.47692307692307\n    }\n  ],\n  \"trend\": [\n    {\n      \"date\": \"2026-10-02\",\n      \"revenue\": 130,\n      \"profit\": 64.32\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Margins filtered by dish",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/margins?outlet_id={{outletId}}&dish_id={{dishId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "margins"
+              ],
+              "query": [
+                {
+                  "key": "outlet_id",
+                  "value": "{{outletId}}"
+                },
+                {
+                  "key": "dish_id",
+                  "value": "{{dishId}}"
+                }
+              ]
+            },
+            "description": "Same KPIs restricted to one dish, used by the Dish filter on the dashboard."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only that dish', () => { const d = pm.response.json().dishBreakdown; pm.expect(d.length).to.eql(1); pm.expect(d[0].dish_name).to.eql('Masala Dosa'); });"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/dashboard/margins?outlet_id={{outletId}}&dish_id={{dishId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "dashboard",
+                    "margins"
+                  ],
+                  "query": [
+                    {
+                      "key": "outlet_id",
+                      "value": "{{outletId}}"
+                    },
+                    {
+                      "key": "dish_id",
+                      "value": "{{dishId}}"
+                    }
+                  ]
+                },
+                "description": "Same KPIs restricted to one dish, used by the Dish filter on the dashboard."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"kpis\": {\n    \"totalRevenue\": 390,\n    \"totalProfit\": 217.95999999999998,\n    \"marginPct\": 55.88717948717948,\n    \"orderCount\": 2\n  },\n  \"dishBreakdown\": [\n    {\n      \"dish_name\": \"Masala Dosa\",\n      \"revenue\": 390,\n      \"profit\": 217.95999999999998,\n      \"orders\": 2,\n      \"marginPct\": 55.88717948717948\n    }\n  ],\n  \"trend\": [\n    {\n      \"date\": \"2026-10-01\",\n      \"revenue\": 260,\n      \"profit\": 153.64\n    },\n    {\n      \"date\": \"2026-10-02\",\n      \"revenue\": 130,\n      \"profit\": 64.32\n    }\n  ]\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "Profit analytics for one outlet. Optional filters: platform_id, dish_id, date_from, date_to (YYYY-MM-DD). Returns KPIs, a dish breakdown sorted worst margin first, and a daily trend."
     },
     {
       "name": "9. AI assistant",
       "item": [
         {
-          "name": "Ask the assistant",
+          "name": "Ask a question (multi-tool)",
           "request": {
             "method": "POST",
             "header": [
@@ -2170,9 +4413,319 @@
                 "chat"
               ]
             },
+            "description": "A question that needs two tools (margin_by_dish + margin_by_platform). Gemini calls both in one round.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"message\": \"Which dishes lose money?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
+              "raw": "{\n  \"message\": \"Which dishes lose money, and which platform is worst for margins?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Answered, or AI busy (503)', () => pm.expect([200, 503]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) {",
+                  "  const r = pm.response.json();",
+                  "  pm.test('Reply is text', () => pm.expect(r.reply).to.be.a('string').and.not.empty);",
+                  "  pm.test('Lists the data tools it used', () => pm.expect(r.tools_used).to.be.an('array'));",
+                  "  pm.test('Names the model', () => pm.expect(r.model).to.be.a('string'));",
+                  "} else {",
+                  "  pm.test('Busy message', () => pm.expect(pm.response.json().error).to.match(/busy/i));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/ai/chat",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "chat"
+                  ]
+                },
+                "description": "A question that needs two tools (margin_by_dish + margin_by_platform). Gemini calls both in one round.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"message\": \"Which dishes lose money, and which platform is worst for margins?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"reply\": \"Based on all order data:\\n\\n* **Dishes losing money:** None. The only dish ordered so far is **Masala Dosa**, generating a **55.9% margin** (₹217.96 profit on ₹390 revenue across 2 orders) with **0 loss-making orders**.\\n* **Worst platform:** **Zomato** is currently the only platform with orders, performing well at a **55.9% net margin**.\\n\\n**Recommendation:** Consider introducing new menu items or expanding to additional delivery platforms (like Swiggy or Direct) to scale sales while maintaining healthy overall margins.\",\n  \"tools_used\": [\n    \"margin_by_dish\",\n    \"margin_by_platform\",\n    \"menu_costing\",\n    \"get_kpis\"\n  ],\n  \"model\": \"gemini-3.5-flash\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Follow-up using conversation history",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "chat"
+              ]
+            },
+            "description": "\"its\" only makes sense with the earlier turns, which are sent in `history` (last 10 turns are used). Expected tool: price_simulation.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What if I raise its price by 15%?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {},\n  \"history\": [\n    {\n      \"role\": \"user\",\n      \"text\": \"Which dish has the lowest margin?\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"text\": \"Masala Dosa has the lowest margin.\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Answered, or AI busy (503)', () => pm.expect([200, 503]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) {",
+                  "  const r = pm.response.json();",
+                  "  pm.test('Reply is text', () => pm.expect(r.reply).to.be.a('string').and.not.empty);",
+                  "  pm.test('Lists the data tools it used', () => pm.expect(r.tools_used).to.be.an('array'));",
+                  "  pm.test('Names the model', () => pm.expect(r.model).to.be.a('string'));",
+                  "} else {",
+                  "  pm.test('Busy message', () => pm.expect(pm.response.json().error).to.match(/busy/i));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/ai/chat",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "chat"
+                  ]
+                },
+                "description": "\"its\" only makes sense with the earlier turns, which are sent in `history` (last 10 turns are used). Expected tool: price_simulation.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"message\": \"What if I raise its price by 15%?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {},\n  \"history\": [\n    {\n      \"role\": \"user\",\n      \"text\": \"Which dish has the lowest margin?\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"text\": \"Masala Dosa has the lowest margin.\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"reply\": \"Raising the price of Masala Dosa by 15% (from ₹130 to ₹149.50) would increase profit across past orders from ₹217.96 to ₹262.65, generating an additional ₹44.69 (+20.5%). \\n\\nThis price adjustment improves Masala Dosa's profit margin from 55.9% to 58.6%.\\n\\n**Suggestion:** Consider testing the ₹149.50 price point on top delivery platforms first to gauge customer demand before applying the increase across all channels.\",\n  \"tools_used\": [\n    \"margin_by_dish\",\n    \"price_simulation\"\n  ],\n  \"model\": \"gemini-3.5-flash\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Ask with dashboard filters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "chat"
+              ]
+            },
+            "description": "The filters are applied to every order-based tool, exactly as on the dashboard.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"How much did I spend on commission and discounts?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {\n    \"platform_id\": \"{{platformId}}\",\n    \"date_from\": \"2026-10-01\",\n    \"date_to\": \"2026-10-31\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Answered, or AI busy (503)', () => pm.expect([200, 503]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) {",
+                  "  const r = pm.response.json();",
+                  "  pm.test('Reply is text', () => pm.expect(r.reply).to.be.a('string').and.not.empty);",
+                  "  pm.test('Lists the data tools it used', () => pm.expect(r.tools_used).to.be.an('array'));",
+                  "  pm.test('Names the model', () => pm.expect(r.model).to.be.a('string'));",
+                  "} else {",
+                  "  pm.test('Busy message', () => pm.expect(pm.response.json().error).to.match(/busy/i));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "503 AI busy (all Gemini models busy or out of quota)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/ai/chat",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "chat"
+                  ]
+                },
+                "description": "The filters are applied to every order-based tool, exactly as on the dashboard.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"message\": \"How much did I spend on commission and discounts?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {\n    \"platform_id\": \"{{platformId}}\",\n    \"date_from\": \"2026-10-01\",\n    \"date_to\": \"2026-10-31\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Service Unavailable",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"The AI service is busy right now. Please try again in a minute.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "AI insight cards",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/insights",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "insights"
+              ]
+            },
+            "description": "Three or four short insight cards for the dashboard. Always 200: Gemini-written when available, otherwise calculated.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2187,14 +4740,255 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Reply text', () => pm.expect(pm.response.json().reply).to.be.a('string'));"
+                  "const r = pm.response.json();",
+                  "pm.test('Has insight cards', () => pm.expect(r.insights).to.be.an('array').and.not.empty);",
+                  "pm.test('Each card has type, title and detail', () => r.insights.forEach((i) => { pm.expect(['warning', 'positive', 'tip']).to.include(i.type); pm.expect(i.title).to.be.a('string'); pm.expect(i.detail).to.be.a('string'); }));",
+                  "pm.test('Source is ai or computed', () => pm.expect(['ai', 'computed']).to.include(r.source));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/ai/insights",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "insights"
+                  ]
+                },
+                "description": "Three or four short insight cards for the dashboard. Always 200: Gemini-written when available, otherwise calculated.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"insights\": [\n    {\n      \"type\": \"tip\",\n      \"title\": \"Masala Dosa has the thinnest margin\",\n      \"detail\": \"55.9% margin over 2 orders.\"\n    }\n  ],\n  \"source\": \"computed\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Chat without a message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "chat"
+              ]
+            },
+            "description": "Validation: message and outlet_id are required.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"outlet_id\": \"{{outletId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/ai/chat",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "chat"
+                  ]
+                },
+                "description": "Validation: message and outlet_id are required.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"outlet_id\": \"{{outletId}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"message and outlet_id required\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Chat about an outlet you do not own",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "chat"
+              ]
+            },
+            "description": "The assistant only reads outlets that belong to the logged-in account.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Which dishes lose money?\",\n  \"outlet_id\": \"000000000000000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/ai/chat",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "chat"
+                  ]
+                },
+                "description": "The assistant only reads outlets that belong to the logged-in account.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"message\": \"Which dishes lose money?\",\n  \"outlet_id\": \"000000000000000000000000\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"You do not own this outlet\"\n}"
             }
           ]
         }
       ],
-      "description": "Needs GEMINI_API_KEY in backend/.env. Calls the Gemini API with tool-calling over the outlet's order data."
+      "description": "AI assistant built on Google Gemini with function calling (needs GEMINI_API_KEY in backend/.env).\n\nPOST /ai/chat sends a question, the dashboard filters and the earlier turns of the conversation. Gemini picks from 10 data tools\n(KPIs, cost breakdown, margin by dish/platform, discount impact, profit trend, menu costing, fee rules, recent orders, price what-if);\nthe backend runs them on the outlet's MongoDB data and Gemini answers from the results. The response lists `tools_used` and the `model`.\n\nIf a Gemini model is busy the backend falls back to the next model; if all are busy it returns 503. POST /ai/insights always returns\ninsight cards: written by Gemini when available (`source: \"ai\"`), otherwise calculated from the same numbers (`source: \"computed\"`)."
     },
     {
       "name": "10. Cleanup",
@@ -2218,7 +5012,8 @@
                 "orders",
                 "{{orderId}}"
               ]
-            }
+            },
+            "description": "Owner-only."
           },
           "event": [
             {
@@ -2229,6 +5024,41 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/orders/{{orderId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "orders",
+                    "{{orderId}}"
+                  ]
+                },
+                "description": "Owner-only."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"deleted\": true\n}"
             }
           ]
         },
@@ -2251,7 +5081,8 @@
                 "fee-rules",
                 "{{ruleId}}"
               ]
-            }
+            },
+            "description": "Owner-only."
           },
           "event": [
             {
@@ -2262,6 +5093,41 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/fee-rules/{{ruleId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "fee-rules",
+                    "{{ruleId}}"
+                  ]
+                },
+                "description": "Owner-only."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"deleted\": true\n}"
             }
           ]
         },
@@ -2284,7 +5150,8 @@
                 "recipe-items",
                 "{{recipeItemId}}"
               ]
-            }
+            },
+            "description": "Owner-only."
           },
           "event": [
             {
@@ -2295,6 +5162,41 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/recipe-items/{{recipeItemId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "recipe-items",
+                    "{{recipeItemId}}"
+                  ]
+                },
+                "description": "Owner-only."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"deleted\": true\n}"
             }
           ]
         },
@@ -2317,7 +5219,8 @@
                 "dishes",
                 "{{dishId}}"
               ]
-            }
+            },
+            "description": "Owner-only; removes the dish's orders and recipe items too."
           },
           "event": [
             {
@@ -2328,6 +5231,41 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/dishes/{{dishId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "dishes",
+                    "{{dishId}}"
+                  ]
+                },
+                "description": "Owner-only; removes the dish's orders and recipe items too."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"deleted\": true\n}"
             }
           ]
         },
@@ -2350,7 +5288,8 @@
                 "outlets",
                 "{{outletId}}"
               ]
-            }
+            },
+            "description": "Deleting is owner-only."
           },
           "event": [
             {
@@ -2361,6 +5300,41 @@
                   "pm.test('Status is 403', () => pm.response.to.have.status(403));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets/{{outletId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets",
+                    "{{outletId}}"
+                  ]
+                },
+                "description": "Deleting is owner-only."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Insufficient permissions\"\n}"
             }
           ]
         },
@@ -2383,7 +5357,8 @@
                 "outlets",
                 "{{outletId}}"
               ]
-            }
+            },
+            "description": "Owner-only; removes its dishes, recipe items, fee rules and orders."
           },
           "event": [
             {
@@ -2394,6 +5369,41 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets/{{outletId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets",
+                    "{{outletId}}"
+                  ]
+                },
+                "description": "Owner-only; removes its dishes, recipe items, fee rules and orders."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"deleted\": true\n}"
             }
           ]
         },
@@ -2416,7 +5426,8 @@
                 "users",
                 "{{managerId}}"
               ]
-            }
+            },
+            "description": "Owner-only."
           },
           "event": [
             {
@@ -2427,6 +5438,41 @@
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));"
                 ]
               }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/{{managerId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "{{managerId}}"
+                  ]
+                },
+                "description": "Owner-only."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"deleted\": true\n}"
             }
           ]
         },
@@ -2448,7 +5494,8 @@
               "path": [
                 "outlets"
               ]
-            }
+            },
+            "description": "The manager's old token stops working immediately (401)."
           },
           "event": [
             {
@@ -2460,9 +5507,44 @@
                 ]
               }
             }
+          ],
+          "response": [
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{managerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/outlets",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "outlets"
+                  ]
+                },
+                "description": "The manager's old token stops working immediately (401)."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"error\": \"Account no longer exists\"\n}"
+            }
           ]
         }
-      ]
+      ],
+      "description": "Deletes everything this run created, and checks a removed manager is locked out at once."
     }
   ]
 }

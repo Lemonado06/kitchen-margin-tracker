@@ -1,76 +1,243 @@
 const express = require('express');
 const router = express.Router();
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenAI, Type } = require('@google/genai');
 const { requireAuth } = require('./middleware');
-const { marginByDish, marginByPlatform, discountImpact } = require('./aiTools');
-const { outletFor } = require('./access');
+const tools = require('./aiTools');
+const { Dish, Platform } = require('./models');
+const { outletFor, validId } = require('./access');
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// The SDK's default is 5 retries with up to 60 s between them; keep each call short and let the
+// model fallback below handle a busy model instead
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: { timeout: 25000, retryOptions: { attempts: 1 } },
+});
 
+// Tried in order; a busy or failing model falls through to the next one
+const MODELS = (process.env.GEMINI_MODELS || 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash,gemini-flash-latest')
+  .split(',').map((m) => m.trim()).filter(Boolean);
+
+const noArgs = { type: Type.OBJECT, properties: {} };
 const toolDeclarations = [
-  { name: 'margin_by_dish', description: 'Get profit margin breakdown per dish, sorted worst margin first', parameters: { type: 'object', properties: {} } },
-  { name: 'margin_by_platform', description: 'Get profit margin breakdown per platform (Zomato, Swiggy, Direct)', parameters: { type: 'object', properties: {} } },
-  { name: 'discount_impact', description: 'Compare average profit on discounted vs non-discounted orders', parameters: { type: 'object', properties: {} } },
+  { name: 'get_kpis', description: 'Totals for the filtered orders: order count, revenue, profit, margin %, average order value, average profit per order, number of loss-making orders.', parameters: noArgs },
+  { name: 'cost_breakdown', description: 'Where the revenue goes: commission, GST on commission, discounts, packaging, food cost and profit, each in rupees and as % of revenue.', parameters: noArgs },
+  { name: 'margin_by_dish', description: 'Revenue, profit, order count and margin % per dish, worst margin first.', parameters: noArgs },
+  { name: 'margin_by_platform', description: 'Revenue, profit, order count and margin % per delivery platform (e.g. Zomato, Swiggy, Direct), best first.', parameters: noArgs },
+  { name: 'discount_impact', description: 'Compares discounted and full-price orders: counts, total discount given and average profit per order.', parameters: noArgs },
+  {
+    name: 'profit_trend', description: 'Revenue and profit per day or per week, oldest first.',
+    parameters: { type: Type.OBJECT, properties: { group_by: { type: Type.STRING, enum: ['day', 'week'], description: 'Bucket size, default day' } } },
+  },
+  { name: 'menu_costing', description: 'For every dish on the menu: price, food cost from its recipe items, food cost % and gross margin per plate. Ignores order filters.', parameters: noArgs },
+  { name: 'fee_rules', description: 'Commission % and GST-on-commission % each platform charges this outlet, and the effective cut.', parameters: noArgs },
+  {
+    name: 'recent_orders', description: 'The most recent orders with dish, platform, value, discount and profit.',
+    parameters: { type: Type.OBJECT, properties: { limit: { type: Type.INTEGER, description: 'How many orders, 1-25, default 10' } } },
+  },
+  {
+    name: 'price_simulation', description: 'What-if analysis: profit on a dish\'s past orders if its price were different. Give new_price or change_pct.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        dish_name: { type: Type.STRING, description: 'Dish name as on the menu' },
+        new_price: { type: Type.NUMBER, description: 'New menu price in rupees' },
+        change_pct: { type: Type.NUMBER, description: 'Price change in percent, e.g. 10 or -5' },
+      },
+      required: ['dish_name'],
+    },
+  },
 ];
 
-async function sendWithRetry(chat, payload, retries = 3) {
-  for (let i = 0; i <= retries; i++) {
-    try {
-      return await chat.sendMessage(payload);
-    } catch (err) {
-      const is503 = err.message?.includes('503') || err.message?.includes('UNAVAILABLE');
-      if (is503 && i < retries) {
-        console.log(`503 busy, retrying... (${i + 1}/${retries})`);
-        await new Promise(r => setTimeout(r, 2000 * (i + 1)));
-      } else {
-        throw err;
+const toolImpl = {
+  get_kpis: (o, f) => tools.getKpis(o, f),
+  cost_breakdown: (o, f) => tools.costBreakdown(o, f),
+  margin_by_dish: (o, f) => tools.marginByDish(o, f),
+  margin_by_platform: (o, f) => tools.marginByPlatform(o, f),
+  discount_impact: (o, f) => tools.discountImpact(o, f),
+  profit_trend: (o, f, a) => tools.profitTrend(o, f, a),
+  menu_costing: (o) => tools.menuCosting(o),
+  fee_rules: (o) => tools.feeRules(o),
+  recent_orders: (o, f, a) => tools.recentOrders(o, f, a),
+  price_simulation: (o, f, a) => tools.priceSimulation(o, f, a),
+};
+
+const isBusy = (err) => /503|504|429|UNAVAILABLE|DEADLINE_EXCEEDED|RESOURCE_EXHAUSTED|overloaded|high demand|timed? ?out|abort/i.test(`${err?.name} ${err?.message}`);
+
+// Keep only the filters the margin engine understands, with valid ids
+function cleanFilters(filters = {}) {
+  const out = {};
+  for (const key of ['platform_id', 'dish_id']) if (filters[key] && validId(filters[key])) out[key] = filters[key];
+  for (const key of ['date_from', 'date_to']) if (/^\d{4}-\d{2}-\d{2}$/.test(filters[key] || '')) out[key] = filters[key];
+  return out;
+}
+
+// Plain-English description of the active dashboard filters for the system prompt
+async function describeFilters(filters) {
+  const parts = [];
+  if (filters.platform_id) parts.push(`platform = ${(await Platform.findById(filters.platform_id))?.name}`);
+  if (filters.dish_id) parts.push(`dish = ${(await Dish.findById(filters.dish_id))?.name}`);
+  if (filters.date_from) parts.push(`from ${filters.date_from}`);
+  if (filters.date_to) parts.push(`to ${filters.date_to}`);
+  return parts.length ? parts.join(', ') : 'none (all orders)';
+}
+
+async function systemPrompt(outlet, filters, user) {
+  return [
+    `You are the margin analyst inside Kitchen Margin Tracker, helping ${user.name} (${user.role}) run the cloud kitchen outlet "${outlet.name}"${outlet.city ? ` in ${outlet.city}` : ''}.`,
+    `Today is ${new Date().toISOString().slice(0, 10)}. Currency is Indian rupees; write amounts like ₹1,250.`,
+    `Active dashboard filters: ${await describeFilters(filters)}. Every tool except menu_costing and fee_rules already applies these filters; mention them when they narrow the answer.`,
+    'Profit per order = order value − platform commission − GST on that commission − discount − packaging − food cost (sum of the dish\'s recipe items).',
+    'Always call tools to get numbers. Never invent or estimate figures the tools did not return. Call several tools when a question needs them.',
+    'Answer in 2-6 short sentences or a short bulleted list. Lead with the answer, quote the key numbers, and end with one concrete, practical suggestion when it fits.',
+    'If there is no data for the filters, say so and suggest widening them. Politely decline questions unrelated to the kitchen\'s business.',
+  ].join('\n');
+}
+
+// One full question → answer exchange with tool calls, on one model
+async function runChat(model, { system, history, message, outletId, filters }) {
+  const chat = ai.chats.create({
+    model,
+    config: { systemInstruction: system, tools: [{ functionDeclarations: toolDeclarations }] },
+    history,
+  });
+  const used = [];
+  let response = await chat.sendMessage({ message });
+  for (let round = 0; round < 6 && response.functionCalls?.length; round++) {
+    const parts = await Promise.all(response.functionCalls.map(async (call) => {
+      used.push(call.name);
+      const impl = toolImpl[call.name];
+      let result;
+      try {
+        result = impl ? await impl(outletId, filters, call.args || {}) : { error: `Unknown tool ${call.name}` };
+      } catch (err) {
+        result = { error: err.message };
       }
+      return { functionResponse: { name: call.name, response: { result } } };
+    }));
+    response = await chat.sendMessage({ message: parts });
+  }
+  return { reply: response.text?.trim() || 'Sorry, I could not work that out. Try rephrasing the question.', tools_used: [...new Set(used)] };
+}
+
+// A model that was just busy is tried last for the next 2 minutes, so users don't wait on it again
+const coolingUntil = new Map();
+const COOLDOWN_MS = 2 * 60 * 1000;
+function modelOrder() {
+  const now = Date.now();
+  const ready = MODELS.filter((m) => !(coolingUntil.get(m) > now));
+  return [...ready, ...MODELS.filter((m) => !ready.includes(m))];
+}
+
+// Try each model in turn; only "busy" errors move on to the next model
+async function withFallback(fn) {
+  const started = Date.now();
+  let lastErr;
+  for (const model of modelOrder()) {
+    if (lastErr && Date.now() - started > 75000) break; // give up rather than keep the user waiting
+    try {
+      return { ...(await fn(model)), model };
+    } catch (err) {
+      lastErr = err;
+      coolingUntil.set(model, Date.now() + COOLDOWN_MS);
+      console.log(`AI model ${model} failed: ${err.message?.slice(0, 120)}`);
+      if (!isBusy(err) && !/not found|404|not supported/i.test(err.message || '')) throw err;
     }
   }
+  throw lastErr;
+}
+
+// Rule-based highlights used when every model is busy, so the dashboard always has something to show
+function computedInsights(kpis, byDish, byPlatform, costs) {
+  const insights = [];
+  const worst = byDish[0];
+  const best = byDish[byDish.length - 1];
+  if (worst && worst.profit < 0) insights.push({ type: 'warning', title: `${worst.dish_name} is losing money`, detail: `₹${Math.abs(worst.profit).toLocaleString('en-IN')} lost over ${worst.orders} orders (${worst.marginPct}% margin). Check its discounts and recipe cost.` });
+  else if (worst) insights.push({ type: 'tip', title: `${worst.dish_name} has the thinnest margin`, detail: `${worst.marginPct}% margin over ${worst.orders} orders.` });
+  if (best && best !== worst) insights.push({ type: 'positive', title: `${best.dish_name} earns the most per rupee`, detail: `${best.marginPct}% margin, ₹${best.profit.toLocaleString('en-IN')} profit from ${best.orders} orders.` });
+  if (byPlatform.length > 1) {
+    const top = byPlatform[0], low = byPlatform[byPlatform.length - 1];
+    insights.push({ type: 'tip', title: `${top.platform_name} keeps more of each order`, detail: `${top.marginPct}% margin vs ${low.marginPct}% on ${low.platform_name}.` });
+  }
+  const disc = costs.breakdown.discounts;
+  if (disc.pctOfRevenue >= 5) insights.push({ type: 'warning', title: 'Discounts are eating into profit', detail: `₹${disc.amount.toLocaleString('en-IN')} given away, ${disc.pctOfRevenue}% of revenue.` });
+  if (!insights.length) insights.push({ type: 'tip', title: 'Not enough data yet', detail: `${kpis.orders} orders in this range. Add more orders or widen the filters.` });
+  return insights.slice(0, 4);
 }
 
 module.exports = () => {
+  // CHAT: multi-turn question answering grounded in the outlet's data
   router.post('/chat', requireAuth, async (req, res) => {
-    const { message, outlet_id, filters } = req.body;
+    const { message, outlet_id, history } = req.body;
     if (!message || !outlet_id) return res.status(400).json({ error: 'message and outlet_id required' });
-
     try {
-      if (!(await outletFor(outlet_id, req.user))) return res.status(403).json({ error: 'You do not own this outlet' });
+      const outlet = await outletFor(outlet_id, req.user);
+      if (!outlet) return res.status(403).json({ error: 'You do not own this outlet' });
+      const filters = cleanFilters(req.body.filters);
 
-      const chat = ai.chats.create({
-        model: 'gemini-3.8-flash',
-        config: { tools: [{ functionDeclarations: toolDeclarations }] },
-      });
+      // Last 10 turns of the conversation, in Gemini's format
+      const past = (Array.isArray(history) ? history : [])
+        .filter((h) => h && typeof h.text === 'string' && h.text.trim() && ['user', 'assistant'].includes(h.role))
+        .slice(-10)
+        .map((h) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text.slice(0, 4000) }] }));
+      while (past.length && past[0].role !== 'user') past.shift(); // Gemini history must start with a user turn
 
-      let response = await sendWithRetry(chat, { message });
-      console.log('First response received');
+      const system = await systemPrompt(outlet, filters, req.user);
+      const result = await withFallback((model) => runChat(model, { system, history: past, message: String(message).slice(0, 2000), outletId: outlet._id, filters }));
+      res.json(result);
+    } catch (err) {
+      console.error('AI chat error:', err.message);
+      const busy = isBusy(err);
+      res.status(busy ? 503 : 500).json({ error: busy ? 'The AI service is busy right now. Please try again in a minute.' : err.message || 'AI request failed' });
+    }
+  });
 
-      let calls = response.functionCalls;
-      let iterations = 0;
-
-      while (calls && calls.length > 0 && iterations < 5) {
-        iterations++;
-        const call = calls[0];
-        console.log('Tool call requested:', call.name);
-
-        let toolResult;
-        if (call.name === 'margin_by_dish') toolResult = await marginByDish(outlet_id, filters || {});
-        else if (call.name === 'margin_by_platform') toolResult = await marginByPlatform(outlet_id, filters || {});
-        else if (call.name === 'discount_impact') toolResult = await discountImpact(outlet_id, filters || {});
-
-        console.log('Tool result:', toolResult);
-
-        response = await sendWithRetry(chat, {
-          message: [{ functionResponse: { name: call.name, response: { result: toolResult } } }],
-        });
-        calls = response.functionCalls;
+  // INSIGHTS: 3-4 short highlight cards for the current dashboard filters
+  router.post('/insights', requireAuth, async (req, res) => {
+    const { outlet_id } = req.body;
+    if (!outlet_id) return res.status(400).json({ error: 'outlet_id required' });
+    try {
+      const outlet = await outletFor(outlet_id, req.user);
+      if (!outlet) return res.status(403).json({ error: 'You do not own this outlet' });
+      const filters = cleanFilters(req.body.filters);
+      const [kpis, byDish, byPlatform, costs, menu] = await Promise.all([
+        tools.getKpis(outlet._id, filters), tools.marginByDish(outlet._id, filters), tools.marginByPlatform(outlet._id, filters),
+        tools.costBreakdown(outlet._id, filters), tools.menuCosting(outlet._id),
+      ]);
+      if (kpis.orders === 0) {
+        return res.json({ insights: computedInsights(kpis, byDish, byPlatform, costs), source: 'computed' });
       }
 
-      console.log('Final response text:', response.text);
-      res.json({ reply: response.text });
+      const data = JSON.stringify({ filters: await describeFilters(filters), kpis, byDish, byPlatform, costs, menu });
+      try {
+        const result = await withFallback(async (model) => {
+          const response = await ai.models.generateContent({
+            model,
+            contents: `Here is the profit data for the cloud kitchen outlet "${outlet.name}" (amounts in Indian rupees):\n${data}\n\nWrite 3 or 4 insights a kitchen owner can act on. Each: a short title (max 8 words) and a detail of one or two sentences quoting the numbers. Write money with the ₹ sign (₹1,250), never the word rupees. Use only these numbers. Type is "warning" for problems, "positive" for things going well, "tip" for suggestions.`,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    type: { type: Type.STRING, enum: ['warning', 'positive', 'tip'] },
+                    title: { type: Type.STRING },
+                    detail: { type: Type.STRING },
+                  },
+                  required: ['type', 'title', 'detail'],
+                },
+              },
+            },
+          });
+          return { insights: JSON.parse(response.text).slice(0, 4) };
+        });
+        res.json({ ...result, source: 'ai' });
+      } catch (err) {
+        console.log('Insights falling back to computed highlights:', err.message?.slice(0, 120));
+        res.json({ insights: computedInsights(kpis, byDish, byPlatform, costs), source: 'computed' });
+      }
     } catch (err) {
-      console.error('AI chat error:', err);
-      res.status(500).json({ error: err.message || err.toString() || 'Unknown error' });
+      res.status(500).json({ error: err.message });
     }
   });
 
