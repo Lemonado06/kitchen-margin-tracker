@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
-import { Logo, ThemeToggle } from './ui';
+import { Aurora, Logo, ThemeToggle } from './ui';
 
 const features = [
   { icon: 'trend', text: 'True profit per order after commission, GST, discounts and food cost' },
@@ -11,10 +11,11 @@ const features = [
 // Split-screen card shared by the login and register pages
 export default function AuthShell({ title, subtitle, children }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+    <div className="relative flex min-h-screen items-center justify-center p-4">
+      <Aurora />
       <ThemeToggle className="fixed right-4 top-4" />
-      <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-line bg-surface shadow-sm md:grid-cols-2 animate-scale-in">
-        <div className="hidden flex-col justify-between border-r border-line bg-subtle p-10 md:flex">
+      <div className="glass grid w-full max-w-4xl overflow-hidden rounded-2xl md:grid-cols-2 animate-scale-in">
+        <div className="hidden flex-col justify-between border-r border-line/70 bg-subtle/40 p-10 md:flex">
           <Link to="/" className="flex items-center gap-3 transition hover:opacity-80">
             <Logo size="lg" />
             <span className="text-base font-bold tracking-tight text-ink">Kitchen Margin Tracker</span>

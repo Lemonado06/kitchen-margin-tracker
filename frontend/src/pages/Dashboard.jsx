@@ -149,8 +149,8 @@ export default function Dashboard() {
     <>
       <PageHeader title={`${greeting}, ${user.name?.split(' ')[0]}`} subtitle="Profit after commission, GST, discounts, packaging and food cost." />
 
-      {/* Filter bar */}
-      <Card className="relative z-10 mb-6 flex flex-wrap items-center gap-2 px-4 py-3">
+      {/* Filter bar: frosted glass that stays at the top while the dashboard scrolls under it */}
+      <div className="glass sticky top-16 z-20 mb-6 flex flex-wrap items-center gap-2 rounded-xl px-4 py-3 animate-fade-up lg:top-4">
         <Icon name="filter" className="mr-1 w-4 h-4 text-muted" />
         <Select aria-label="Outlet" className={filterSelect} value={outletId} onChange={(e) => { setOutletId(e.target.value); setDishId(''); }}>
           {(outlets || []).map((o) => <option key={o.id} value={o.id}>{o.name}{o.city ? ` · ${o.city}` : ''}</option>)}
@@ -173,7 +173,7 @@ export default function Dashboard() {
             Clear filters
           </button>
         )}
-      </Card>
+      </div>
 
       <ErrorText>{error}</ErrorText>
 

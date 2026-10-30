@@ -33,7 +33,7 @@ export function FeedbackProvider({ children }) {
       <div className="pointer-events-none fixed bottom-6 right-6 z-[60] flex flex-col gap-2">
         {toasts.map((t) => (
           <div key={t.id} role="status"
-            className="pointer-events-auto flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-sm font-medium text-ink shadow-lg animate-slide-in-right">
+            className="glass pointer-events-auto flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-ink animate-slide-in-right">
             <span className={`rounded-md p-1 ${t.tone === 'error' ? 'bg-bad-bg text-bad' : 'bg-good-bg text-good'}`}>
               <Icon name={t.tone === 'error' ? 'alert' : 'check'} className="w-4 h-4" />
             </span>

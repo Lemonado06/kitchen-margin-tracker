@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import Icon from '../components/Icon';
 import Reveal from '../components/Reveal';
-import { Logo, ThemeToggle } from '../components/ui';
+import { Aurora, Logo, ThemeToggle } from '../components/ui';
 
 const features = [
   { icon: 'trend', title: 'True profit per order', text: 'Every order is charged its platform commission, GST on that commission, discount, packaging and the dish\'s food cost.' },
@@ -40,7 +40,7 @@ const rupees = (n) => `${n < 0 ? '−' : ''}₹${Math.abs(n).toLocaleString('en-
 
 function Nav({ loggedIn }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur">
+    <header className="glass sticky top-0 z-40 border-x-0 border-t-0">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2.5">
           <Logo />
@@ -77,20 +77,20 @@ function HeroPreview() {
   const bars = [{ name: 'Chicken Biryani', w: 92, good: true }, { name: 'Veg Fried Rice', w: 34, good: true }, { name: 'Paneer Tikka', w: 14, good: false }];
   return (
     <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-      <div className="relative rounded-2xl border border-line bg-surface p-5 shadow-xl shadow-slate-900/5 animate-scale-in [animation-delay:200ms]">
+      <div className="glass relative rounded-2xl p-5 animate-scale-in [animation-delay:200ms]">
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm font-semibold text-ink">My Kitchen · Bengaluru</p>
           <span className="rounded-md border border-line bg-subtle px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Sample data</span>
         </div>
         <div className="mb-4 grid grid-cols-3 gap-2">
           {[['Revenue', '₹2,800', 'text-ink'], ['Profit', '₹1,108', 'text-good'], ['Margin', '39.6%', 'text-ink']].map(([l, v, c]) => (
-            <div key={l} className="rounded-lg border border-line p-3">
+            <div key={l} className="rounded-lg border border-line/70 bg-surface/50 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">{l}</p>
               <p className={`mt-1 text-lg font-extrabold ${c}`}>{v}</p>
             </div>
           ))}
         </div>
-        <div className="mb-4 rounded-lg border border-line p-3">
+        <div className="mb-4 rounded-lg border border-line/70 bg-surface/50 p-3">
           <p className="mb-2 text-xs font-semibold text-ink-2">Profit by dish</p>
           <div className="space-y-2">
             {bars.map((b, i) => (
@@ -109,7 +109,7 @@ function HeroPreview() {
           <p className="text-xs text-ink-2"><span className="font-semibold text-ink">Paneer Tikka</span> is losing ₹26 per order. Heavy Swiggy discounts are the main cause.</p>
         </div>
       </div>
-      <div className="absolute -bottom-14 right-6 hidden rounded-xl border border-line bg-surface px-4 py-3 shadow-lg sm:block animate-[float_6s_ease-in-out_infinite]">
+      <div className="glass absolute -bottom-14 right-6 hidden rounded-xl px-4 py-3 sm:block animate-[float_6s_ease-in-out_infinite]">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Direct orders margin</p>
         <p className="text-lg font-bold text-good">74.1%</p>
       </div>
@@ -122,7 +122,8 @@ export default function Landing() {
   const startTo = loggedIn ? '/dashboard' : '/register';
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-canvas">
+    <div className="min-h-screen overflow-x-hidden">
+      <Aurora />
       <style>{`@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}`}</style>
       <Nav loggedIn={loggedIn} />
 
@@ -245,7 +246,7 @@ export default function Landing() {
             ))}
           </ul>
         </Reveal>
-        <Reveal delay={120} className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        <Reveal delay={120} className="glass rounded-2xl p-5">
           <div className="mb-4 flex items-center gap-2 border-b border-line pb-4">
             <span className="rounded-lg bg-primary p-1.5 text-on-primary"><Icon name="sparkles" className="w-4 h-4" /></span>
             <span className="text-sm font-semibold text-ink">Ask the assistant</span>

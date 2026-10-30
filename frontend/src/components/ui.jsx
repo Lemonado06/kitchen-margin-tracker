@@ -182,11 +182,22 @@ export function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative w-full max-w-md rounded-xl border border-line bg-surface p-6 shadow-xl animate-scale-in">
+      <div className="absolute inset-0 bg-slate-950/30 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+      <div role="dialog" aria-modal="true" className="glass relative w-full max-w-md rounded-xl p-6 animate-scale-in">
         <h2 className="mb-4 text-lg font-semibold text-ink">{title}</h2>
         {children}
       </div>
+    </div>
+  );
+}
+
+// Soft colour shapes behind glass panels (landing and auth pages), so the frosted glass has something to blur
+export function Aurora({ className = 'fixed' }) {
+  return (
+    <div className={`pointer-events-none inset-0 -z-10 overflow-hidden ${className}`} aria-hidden="true">
+      <div className="absolute -left-24 -top-24 h-[26rem] w-[26rem] rounded-full bg-emerald-400/30 blur-3xl dark:bg-emerald-500/20" />
+      <div className="absolute -right-20 top-1/4 h-[24rem] w-[24rem] rounded-full bg-indigo-400/25 blur-3xl dark:bg-indigo-500/20" />
+      <div className="absolute bottom-[-8rem] left-1/3 h-[24rem] w-[24rem] rounded-full bg-amber-300/25 blur-3xl dark:bg-amber-500/10" />
     </div>
   );
 }

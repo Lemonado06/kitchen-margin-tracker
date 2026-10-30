@@ -79,7 +79,7 @@ export default function Layout() {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-surface lg:flex">{nav}</aside>
 
       {/* Mobile top bar + slide-in drawer */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
+      <header className="glass sticky top-0 z-30 flex items-center justify-between rounded-none border-x-0 border-t-0 px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2 text-sm font-bold text-ink">
           <Logo /> Kitchen Margin
         </div>
