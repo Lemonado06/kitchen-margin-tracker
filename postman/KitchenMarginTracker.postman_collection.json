@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Kitchen Margin Tracker API",
-    "description": "All REST endpoints of the Kitchen Margin Tracker backend (Express + MongoDB + Gemini).\n\n**How to run:** import this collection and the `Kitchen Margin Tracker - Local` environment, start the backend (`npm run dev` in backend/),\nselect the environment and run the whole collection in the Collection Runner. Each run registers a fresh owner (via `runId`),\nsaves the JWT automatically, adds a manager, checks every role rule and the margin maths, asks the AI assistant, then cleans up.\n\nEvery request has tests and a saved example response.",
+    "description": "All REST endpoints of the Kitchen Margin Tracker backend (Express + MongoDB + Groq/Gemini AI).\n\n**How to run:** import this collection and the `Kitchen Margin Tracker - Local` environment, start the backend (`npm run dev` in backend/),\nselect the environment and run the whole collection in the Collection Runner. Each run registers a fresh owner (via `runId`),\nsaves the JWT automatically, adds a manager, checks every role rule and the margin maths, asks the AI assistant, then cleans up.\n\nEvery request has tests and a saved example response.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -4416,7 +4416,7 @@
                 "chat"
               ]
             },
-            "description": "A question that needs two tools (margin_by_dish + margin_by_platform). Gemini calls both in one round.",
+            "description": "A question that needs two tools (margin_by_dish + margin_by_platform). The model calls both in one round.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"message\": \"Which dishes lose money, and which platform is worst for margins?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
@@ -4471,7 +4471,7 @@
                     "chat"
                   ]
                 },
-                "description": "A question that needs two tools (margin_by_dish + margin_by_platform). Gemini calls both in one round.",
+                "description": "A question that needs two tools (margin_by_dish + margin_by_platform). The model calls both in one round.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"message\": \"Which dishes lose money, and which platform is worst for margins?\",\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
@@ -4654,7 +4654,7 @@
           ],
           "response": [
             {
-              "name": "503 AI busy (all Gemini models busy or out of quota)",
+              "name": "503 AI busy (all AI models busy or out of quota)",
               "originalRequest": {
                 "method": "POST",
                 "header": [
@@ -4725,7 +4725,7 @@
                 "insights"
               ]
             },
-            "description": "Three or four short insight cards for the dashboard. Always 200: Gemini-written when available, otherwise calculated.",
+            "description": "Three or four short insight cards for the dashboard. Always 200: AI-written when available, otherwise calculated.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
@@ -4776,7 +4776,7 @@
                     "insights"
                   ]
                 },
-                "description": "Three or four short insight cards for the dashboard. Always 200: Gemini-written when available, otherwise calculated.",
+                "description": "Three or four short insight cards for the dashboard. Always 200: AI-written when available, otherwise calculated.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"outlet_id\": \"{{outletId}}\",\n  \"filters\": {}\n}",
@@ -4991,7 +4991,7 @@
           ]
         }
       ],
-      "description": "AI assistant built on Google Gemini with function calling (needs GEMINI_API_KEY in backend/.env).\n\nPOST /ai/chat sends a question, the dashboard filters and the earlier turns of the conversation. Gemini picks from 10 data tools\n(KPIs, cost breakdown, margin by dish/platform, discount impact, profit trend, menu costing, fee rules, recent orders, price what-if);\nthe backend runs them on the outlet's MongoDB data and Gemini answers from the results. The response lists `tools_used` and the `model`.\n\nIf a Gemini model is busy the backend falls back to the next model; if all are busy it returns 503. POST /ai/insights always returns\ninsight cards: written by Gemini when available (`source: \"ai\"`), otherwise calculated from the same numbers (`source: \"computed\"`)."
+      "description": "AI assistant built on Groq with function calling, Google Gemini as backup (needs GROQ_API_KEY or GEMINI_API_KEY in backend/.env).\n\nPOST /ai/chat sends a question, the dashboard filters and the earlier turns of the conversation. The model picks from 10 data tools\n(KPIs, cost breakdown, margin by dish/platform, discount impact, profit trend, menu costing, fee rules, recent orders, price what-if);\nthe backend runs them on the outlet's MongoDB data and the model answers from the results. The response lists `tools_used` and the `model`.\n\nIf a model is busy the backend falls back to the next one (Groq models first, then Gemini); if all are busy it returns 503. POST /ai/insights always returns\ninsight cards: written by the AI when available (`source: \"ai\"`), otherwise calculated from the same numbers (`source: \"computed\"`)."
     },
     {
       "name": "10. Cleanup",

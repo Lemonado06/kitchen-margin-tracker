@@ -2,7 +2,7 @@
 
 Profit tracker for cloud kitchens selling on Zomato, Swiggy and direct orders. It works out the real profit on every order after platform commission, GST on that commission, discounts, packaging and food cost, and shows it on a dashboard with an AI assistant you can ask about your margins. A public landing page at `/` explains the product; the app itself is behind login.
 
-**Stack:** React 19 + Vite + Tailwind CSS 4 + Recharts (frontend) · Node.js + Express 5 + MongoDB with Mongoose (backend) · JWT auth with bcrypt · Google Gemini tool-calling for the assistant.
+**Stack:** React 19 + Vite + Tailwind CSS 4 + Recharts (frontend) · Node.js + Express 5 + MongoDB with Mongoose (backend) · JWT auth with bcrypt · Groq (with Google Gemini as backup) tool-calling for the assistant.
 
 ## Run it locally
 
@@ -12,7 +12,7 @@ You need Node.js 20+ and a MongoDB database: either [MongoDB Community Server](h
 # 1. Backend
 cd backend
 npm install
-cp .env.example .env      # then set MONGODB_URI, JWT_SECRET and GEMINI_API_KEY
+cp .env.example .env      # then set MONGODB_URI, JWT_SECRET and GROQ_API_KEY (GEMINI_API_KEY optional)
 npm run seed              # optional: demo data (owner@demo.com / demo123, manager@demo.com / demo123)
 npm run dev               # API on http://localhost:5000
 
@@ -26,7 +26,7 @@ npm run dev               # app on http://localhost:5173
 - Local: `mongodb://127.0.0.1:27017/kitchen_margin_tracker`
 - Atlas: `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/kitchen_margin_tracker`
 
-The server creates the Zomato, Swiggy and Direct platforms on first start. `GEMINI_MODELS` (optional) sets the Gemini models the assistant tries, in order. Set `VITE_API_URL` in `frontend/.env` if the API is not on `http://localhost:5000`.
+The server creates the Zomato, Swiggy and Direct platforms on first start. `GROQ_MODELS` and `GEMINI_MODELS` (optional) set the models the assistant tries, in order. Set `VITE_API_URL` in `frontend/.env` if the API is not on `http://localhost:5000`.
 
 ## Users and roles
 
@@ -58,11 +58,11 @@ Models are in [backend/models.js](backend/models.js). Deleting an outlet or dish
 
 ## AI assistant
 
-Built on Google Gemini with function calling, and grounded in the outlet's own MongoDB data:
+Built on [Groq](https://console.groq.com) (OpenAI-compatible API, open models such as gpt-oss-120b) with function calling, with Google Gemini as the backup provider, and grounded in the outlet's own MongoDB data:
 
-- **Chat** (`POST /ai/chat`): sends the question, the active dashboard filters (platform, dish, dates) and the last 10 turns of the conversation, so follow-ups like "what if I raise its price?" work. Gemini chooses from 10 tools: KPIs, cost breakdown, margin by dish, margin by platform, discount impact, profit trend (day/week), menu costing, fee rules, recent orders and a price what-if simulator. It can call several tools in one round. Each answer lists the tools it used and the model that wrote it.
-- **Insights** (`POST /ai/insights`): 3–4 insight cards for the dashboard's current filters, written by Gemini as structured JSON. If Gemini is unavailable, the cards are calculated from the same numbers instead, so the dashboard never shows an error.
-- **Reliability**: each Gemini call has a 25 s timeout; a busy model (503/504/429) falls through to the next model in `GEMINI_MODELS` and is skipped for 2 minutes.
+- **Chat** (`POST /ai/chat`): sends the question, the active dashboard filters (platform, dish, dates) and the last 10 turns of the conversation, so follow-ups like "what if I raise its price?" work. The model chooses from 10 tools: KPIs, cost breakdown, margin by dish, margin by platform, discount impact, profit trend (day/week), menu costing, fee rules, recent orders and a price what-if simulator. It can call several tools in one round. Each answer lists the tools it used and the model that wrote it.
+- **Insights** (`POST /ai/insights`): 3–4 insight cards for the dashboard's current filters, written by the model as JSON. If no model is available, the cards are calculated from the same numbers instead, so the dashboard never shows an error.
+- **Reliability**: each call has a 25 s timeout. Models are tried in order: the Groq models in `GROQ_MODELS` (default `openai/gpt-oss-120b`, `qwen/qwen3.8-27b`, `openai/gpt-oss-20b`), then the Gemini models in `GEMINI_MODELS`. A model that fails or hits its rate limit falls through to the next one and is skipped for 2 minutes. Only one of `GROQ_API_KEY` / `GEMINI_API_KEY` is required.
 
 Code: [backend/ai.js](backend/ai.js) (routes, prompts, model fallback) and [backend/aiTools.js](backend/aiTools.js) (the data tools).
 

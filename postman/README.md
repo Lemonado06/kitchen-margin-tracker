@@ -4,7 +4,7 @@
 |---|---|
 | `KitchenMarginTracker.postman_collection.json` | 64 requests in 11 folders, each with tests, a description and a saved example response |
 | `KitchenMarginTracker.local.postman_environment.json` | Sets `baseUrl` to `http://localhost:5000` |
-| `report/test-report.html` | HTML report of the last full run (64 requests, 94 assertions, 0 failures; the exact assertion count depends on whether Gemini answered the AI requests). Open it in a browser |
+| `report/test-report.html` | HTML report of the last full run (64 requests, 100 assertions, 0 failures; the exact assertion count depends on whether the AI answered the chat requests). Open it in a browser |
 
 ## Run it in Postman
 
@@ -41,4 +41,4 @@ newman run postman/KitchenMarginTracker.postman_collection.json -e postman/Kitch
 | 9. AI assistant | Multi-tool question, follow-up with conversation history, filtered question, insight cards, validation and ownership checks |
 | 10. Cleanup | Deletes the test data; a removed manager is locked out |
 
-The AI chat requests need `GEMINI_API_KEY`. When every Gemini model is busy or out of quota, the API answers **503** with a "busy" message, and the tests accept that. `/ai/insights` always answers 200: Gemini writes the cards when it's available, otherwise they are calculated from the same numbers (`source: "computed"`).
+The AI chat requests need `GROQ_API_KEY` (or `GEMINI_API_KEY`). When every model is busy or out of quota, the API answers **503** with a "busy" message, and the tests accept that. `/ai/insights` always answers 200: the AI writes the cards when it's available, otherwise they are calculated from the same numbers (`source: "computed"`).
