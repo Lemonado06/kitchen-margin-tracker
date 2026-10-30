@@ -6,7 +6,7 @@ import { Backdrop } from '../components/Layout';
 const features = [
   { icon: 'trend', title: 'True profit per order', text: 'Every order is charged its platform commission, GST on that commission, discount, packaging and the dish\'s food cost.' },
   { icon: 'dashboard', title: 'Analytics dashboard', text: 'Revenue, profit, margin and order KPIs, a profit trend, and dishes ranked by margin. Filter by outlet, platform, dish and date.' },
-  { icon: 'sparkles', title: 'AI margin assistant', text: 'Ask in plain English. Gemini calls 10 data tools on your own orders and answers with real numbers, never guesses.' },
+  { icon: 'sparkles', title: 'AI margin assistant', text: 'Ask in plain English. The AI calls 10 data tools on your own orders and answers with real numbers, never guesses.' },
   { icon: 'chef', title: 'Menu costing', text: 'Break each dish into ingredients and see its food cost and food-cost percentage against the menu price.' },
   { icon: 'percent', title: 'Platform fee rules', text: 'Set Zomato, Swiggy, Direct or any other platform\'s commission and GST per outlet, and see each one\'s effective cut.' },
   { icon: 'users', title: 'Owner and manager roles', text: 'Owners add managers who share their outlets. Managers record and edit data; only owners delete or manage the team.' },
@@ -236,7 +236,7 @@ export default function Landing() {
           <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">AI assistant</p>
           <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">Ask your numbers a question</h2>
           <p className="mt-4 text-slate-300">
-            The assistant runs on Google Gemini with function calling. It never guesses: it picks from 10 tools that
+            The assistant runs on Groq (with Google Gemini as backup) using function calling. It never guesses: it picks from 10 tools that
             read your outlet's orders, menu and fee rules, follows the dashboard filters, and remembers the conversation
             so you can ask follow-ups.
           </p>

@@ -43,9 +43,34 @@ module.exports = () => {
       });
       const trend = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
 
+      // Group by platform, best margin first
+      const byPlatform = {};
+      rows.forEach(r => {
+        if (!byPlatform[r.platform_name]) byPlatform[r.platform_name] = { platform_name: r.platform_name, revenue: 0, profit: 0, orders: 0 };
+        byPlatform[r.platform_name].revenue += r.orderValue;
+        byPlatform[r.platform_name].profit += r.profit;
+        byPlatform[r.platform_name].orders += 1;
+      });
+      const platformBreakdown = Object.values(byPlatform)
+        .map(p => ({ ...p, marginPct: p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0 }))
+        .sort((a, b) => b.marginPct - a.marginPct);
+
+      // Where the revenue goes: every deduction plus what is left as profit
+      const sum = (f) => rows.reduce((s, r) => s + f(r), 0);
+      const costBreakdown = [
+        { name: 'Food cost', amount: sum(r => r.food_cost) },
+        { name: 'Commission', amount: sum(r => r.commission) },
+        { name: 'GST on commission', amount: sum(r => r.gst_on_commission) },
+        { name: 'Discounts', amount: sum(r => r.discount_amount) },
+        { name: 'Packaging', amount: sum(r => r.packaging_cost) },
+        { name: 'Profit', amount: totalProfit },
+      ];
+
       res.json({
         kpis: { totalRevenue, totalProfit, marginPct, orderCount },
         dishBreakdown,
+        platformBreakdown,
+        costBreakdown,
         trend,
       });
     } catch (err) {

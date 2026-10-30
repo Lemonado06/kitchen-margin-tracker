@@ -228,7 +228,7 @@ async function priceSimulation(outletId, filters, { dish_name, new_price, change
     profitChange: round(simulated - current),
     currentMarginPct: pct(current, revenueNow),
     simulatedMarginPct: pct(simulated, revenueNew),
-    assumption: 'Same number of orders, same discounts and packaging; commission scales with order value.',
+    assumption: 'Same number of orders, same discounts and packaging; commission scales with order value. Profit figures are totals over ordersConsidered orders, not per order.',
   };
 }
 
