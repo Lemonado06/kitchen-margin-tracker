@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -28,7 +29,7 @@ function App() {
             <Route path="/team" element={<ProtectedRoute role="owner"><Team /></ProtectedRoute>} />
             <Route path="/profile" element={<Profile />} />
           </Route>
-          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/" element={<Landing />} />
           <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
       </BrowserRouter>

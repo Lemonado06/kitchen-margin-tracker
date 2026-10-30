@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Backdrop } from './Layout';
 import Icon from './Icon';
 
@@ -14,12 +15,12 @@ export default function AuthShell({ title, subtitle, children }) {
       <Backdrop />
       <div className="glass grid w-full max-w-4xl overflow-hidden rounded-3xl md:grid-cols-2 animate-scale-in">
         <div className="relative hidden flex-col justify-between border-r border-white/10 bg-gradient-to-br from-emerald-500/15 via-transparent to-indigo-500/15 p-10 md:flex">
-          <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3 transition hover:opacity-90">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-500/30">
               <Icon name="chef" className="w-6 h-6" strokeWidth={2.2} />
             </div>
             <span className="text-lg font-bold text-white">Kitchen Margin Tracker</span>
-          </div>
+          </Link>
           <div>
             <h2 className="text-3xl font-extrabold leading-tight text-white">
               Know which dishes <span className="text-gradient">actually make money.</span>

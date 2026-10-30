@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import api, { getUser } from '../api/client';
 import AIChat from '../components/AIChat';
+import AIInsights from '../components/AIInsights';
 import { formatINR } from '../hooks';
 import Icon from '../components/Icon';
 import { AnimatedNumber, Badge, Button, Card, EmptyState, ErrorText, Field, Input, PageHeader, Select, Skeleton } from '../components/ui';
@@ -37,6 +38,8 @@ export default function Dashboard() {
   const [platforms, setPlatforms] = useState([]);
   const [outletId, setOutletId] = useState('');
   const [platformId, setPlatformId] = useState('');
+  const [dishes, setDishes] = useState([]);
+  const [dishId, setDishId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [data, setData] = useState(null);
@@ -56,12 +59,19 @@ export default function Dashboard() {
     loadFilters();
   }, []);
 
+  // Dish filter options follow the selected outlet
+  useEffect(() => {
+    if (!outletId) return;
+    api.get(`/dishes/outlet/${outletId}`).then((res) => setDishes(res.data)).catch(() => setDishes([]));
+  }, [outletId]);
+
   useEffect(() => {
     if (!outletId) return;
     async function loadMargins() {
       try {
         const params = { outlet_id: outletId };
         if (platformId) params.platform_id = platformId;
+        if (dishId) params.dish_id = dishId;
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
         const res = await api.get('/dashboard/margins', { params });
@@ -72,11 +82,18 @@ export default function Dashboard() {
       }
     }
     loadMargins();
-  }, [outletId, platformId, dateFrom, dateTo]);
+  }, [outletId, platformId, dishId, dateFrom, dateTo]);
 
-  const hasFilters = platformId || dateFrom || dateTo;
+  const hasFilters = platformId || dishId || dateFrom || dateTo;
+  const filters = {
+    platform_id: platformId || undefined,
+    dish_id: dishId || undefined,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+  };
   function clearFilters() {
     setPlatformId('');
+    setDishId('');
     setDateFrom('');
     setDateTo('');
   }
@@ -100,9 +117,9 @@ export default function Dashboard() {
       <PageHeader title={`${greeting}, ${user.name?.split(' ')[0]}`} subtitle="Profit after commission, GST, discounts, packaging and food cost." />
 
       {/* Filters */}
-      <Card className="relative z-10 mb-6 grid grid-cols-2 gap-4 p-5 md:grid-cols-4">
+      <Card className="relative z-10 mb-6 grid grid-cols-2 gap-4 p-5 md:grid-cols-3 xl:grid-cols-5">
         <Field label="Outlet">
-          <Select value={outletId} onChange={(e) => setOutletId(e.target.value)}>
+          <Select value={outletId} onChange={(e) => { setOutletId(e.target.value); setDishId(''); }}>
             {(outlets || []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
           </Select>
         </Field>
@@ -112,6 +129,12 @@ export default function Dashboard() {
             {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
         </Field>
+        <Field label="Dish">
+          <Select value={dishId} onChange={(e) => setDishId(e.target.value)}>
+            <option value="">All dishes</option>
+            {dishes.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </Select>
+        </Field>
         <Field label="From">
           <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         </Field>
@@ -119,7 +142,7 @@ export default function Dashboard() {
           <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         </Field>
         {hasFilters && (
-          <button onClick={clearFilters} className="col-span-2 justify-self-start text-xs font-semibold text-emerald-300 hover:text-emerald-200 md:col-span-4 animate-fade-in">
+          <button onClick={clearFilters} className="col-span-2 justify-self-start text-xs font-semibold text-emerald-300 hover:text-emerald-200 md:col-span-3 xl:col-span-5 animate-fade-in">
             Clear filters
           </button>
         )}
@@ -148,6 +171,8 @@ export default function Dashboard() {
             <Kpi label="Orders" icon="bag" value={data.kpis.orderCount} format={(v) => Math.round(v)} delay={180}
               tone={{ glow: 'bg-amber-500', icon: 'bg-amber-400/10 text-amber-300', text: 'text-white' }} />
           </div>
+
+          <AIInsights outletId={outletId} filters={filters} />
 
           {/* Charts */}
           <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -194,14 +219,7 @@ export default function Dashboard() {
 
           {/* AI Assistant */}
           <div className="mb-6">
-            <AIChat
-              outletId={outletId}
-              filters={{
-                platform_id: platformId || undefined,
-                date_from: dateFrom || undefined,
-                date_to: dateTo || undefined,
-              }}
-            />
+            <AIChat outletId={outletId} filters={filters} />
           </div>
 
           {/* Dish table, worst margin first */}
