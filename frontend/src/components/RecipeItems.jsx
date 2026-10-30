@@ -62,41 +62,41 @@ export default function RecipeItems({ dishId, dishPrice }) {
 
   const foodCost = items.reduce((s, i) => s + parseFloat(i.cost), 0);
   const foodCostPct = dishPrice > 0 ? (foodCost / dishPrice) * 100 : 0;
-  const barTone = foodCostPct > 45 ? 'from-rose-500 to-rose-400' : foodCostPct > 30 ? 'from-amber-500 to-amber-300' : 'from-emerald-500 to-cyan-400';
+  const barTone = foodCostPct > 45 ? 'bg-[var(--chart-loss)]' : foodCostPct > 30 ? 'bg-[var(--chart-commission)]' : 'bg-[var(--chart-profit)]';
 
   return (
-    <div className="mt-4 border-t border-white/10 pt-4 animate-fade-up">
+    <div className="mt-4 border-t border-line pt-4 animate-fade-up">
       <div className="mb-4">
         <div className="mb-1.5 flex items-baseline justify-between text-sm">
-          <span className="font-semibold text-white">Food cost: ₹{foodCost.toFixed(2)}</span>
-          <span className="text-slate-400">{foodCostPct.toFixed(1)}% of price</span>
+          <span className="font-semibold text-ink">Food cost: ₹{foodCost.toFixed(2)}</span>
+          <span className="text-muted">{foodCostPct.toFixed(1)}% of price</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-white/10">
-          <div className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${barTone}`} style={{ width: `${Math.min(100, foodCostPct)}%` }} />
+        <div className="h-2 overflow-hidden rounded-full bg-subtle">
+          <div className={`h-full rounded-full transition-all duration-700 ease-out ${barTone}`} style={{ width: `${Math.min(100, foodCostPct)}%` }} />
         </div>
       </div>
 
-      <ul className="mb-3 divide-y divide-white/5">
+      <ul className="mb-3 divide-y divide-line">
         {items.map((item) => (
           <li key={item.id} className="group flex items-center justify-between py-2 text-sm animate-fade-in">
-            <span className="text-slate-200">{item.ingredient_name}</span>
+            <span className="text-ink">{item.ingredient_name}</span>
             <span className="flex items-center gap-3">
-              <span className="text-slate-300">₹{item.cost}</span>
-              <button onClick={() => startEdit(item)} className="rounded-md p-1 text-slate-500 transition hover:bg-white/10 hover:text-white" aria-label="Edit ingredient">
+              <span className="text-ink-2">₹{item.cost}</span>
+              <button onClick={() => startEdit(item)} className="rounded-md p-1 text-muted transition hover:bg-subtle hover:text-ink" aria-label="Edit ingredient">
                 <Icon name="edit" className="w-3.5 h-3.5" />
               </button>
               {isOwner() && (
-                <button onClick={() => handleDelete(item)} className="rounded-md p-1 text-slate-500 transition hover:bg-rose-500/15 hover:text-rose-300" aria-label="Delete ingredient">
+                <button onClick={() => handleDelete(item)} className="rounded-md p-1 text-muted transition hover:bg-bad-bg hover:text-bad" aria-label="Delete ingredient">
                   <Icon name="trash" className="w-3.5 h-3.5" />
                 </button>
               )}
             </span>
           </li>
         ))}
-        {items.length === 0 && <li className="py-2 text-sm text-slate-500">No ingredients yet. Food cost counts as ₹0.</li>}
+        {items.length === 0 && <li className="py-2 text-sm text-muted">No ingredients yet. Food cost counts as ₹0.</li>}
       </ul>
 
-      <form onSubmit={handleSubmit} className={`flex flex-col gap-2 sm:flex-row ${editingId ? 'rounded-xl ring-2 ring-amber-400/60 p-2' : ''}`}>
+      <form onSubmit={handleSubmit} className={`flex flex-col gap-2 sm:flex-row ${editingId ? 'rounded-xl ring-2 ring-warn p-2' : ''}`}>
         <Input type="text" placeholder="Ingredient" value={ingredient} onChange={(e) => setIngredient(e.target.value)} required />
         <Input type="number" placeholder="Cost (₹)" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} className="sm:w-32" required />
         <div className="flex gap-2">
@@ -105,7 +105,7 @@ export default function RecipeItems({ dishId, dishPrice }) {
         </div>
       </form>
 
-      {(error || loadError) && <p className="mt-2 text-sm text-rose-300">{error || loadError}</p>}
+      {(error || loadError) && <p className="mt-2 text-sm text-bad">{error || loadError}</p>}
     </div>
   );
 }

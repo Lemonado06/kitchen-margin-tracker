@@ -46,15 +46,15 @@ export default function Register() {
         <Field label="Password" hint="At least 6 characters">
           <PasswordInput minLength={6} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </Field>
-        <div className="flex items-start gap-2 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3 text-xs text-cyan-100/80">
-          <Icon name="info" className="mt-0.5 w-4 h-4 shrink-0 text-cyan-300" />
+        <div className="flex items-start gap-2 rounded-lg border border-info-line bg-info-bg p-3 text-xs text-info">
+          <Icon name="info" className="mt-0.5 w-4 h-4 shrink-0 text-info" />
           Managers don't sign up here. Once you're in, add them from the Team page and they'll share your outlets.
         </div>
         <Button type="submit" size="lg" loading={loading} icon="arrowRight" className="w-full">
           Create account
         </Button>
-        <p className="pt-2 text-center text-sm text-slate-400">
-          Already have an account? <Link to="/login" className="font-semibold text-emerald-300 hover:text-emerald-200">Log in</Link>
+        <p className="pt-2 text-center text-sm text-muted">
+          Already have an account? <Link to="/login" className="font-semibold text-good hover:text-good">Log in</Link>
         </p>
       </form>
     </AuthShell>

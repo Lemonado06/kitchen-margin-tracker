@@ -33,8 +33,8 @@ export function FeedbackProvider({ children }) {
       <div className="pointer-events-none fixed bottom-6 right-6 z-[60] flex flex-col gap-2">
         {toasts.map((t) => (
           <div key={t.id} role="status"
-            className="glass-strong pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-slate-100 animate-slide-in-right">
-            <span className={`rounded-lg p-1 ${t.tone === 'error' ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+            className="pointer-events-auto flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-sm font-medium text-ink shadow-lg animate-slide-in-right">
+            <span className={`rounded-md p-1 ${t.tone === 'error' ? 'bg-bad-bg text-bad' : 'bg-good-bg text-good'}`}>
               <Icon name={t.tone === 'error' ? 'alert' : 'check'} className="w-4 h-4" />
             </span>
             {t.message}
@@ -43,7 +43,7 @@ export function FeedbackProvider({ children }) {
       </div>
 
       <Modal open={!!dialog} onClose={() => close(false)} title={dialog?.title}>
-        <p className="mb-6 text-sm text-slate-300">{dialog?.message}</p>
+        <p className="mb-6 text-sm text-ink-2">{dialog?.message}</p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => close(false)}>Cancel</Button>
           <Button variant={dialog?.danger === false ? 'primary' : 'danger'} icon={dialog?.danger === false ? 'check' : 'trash'} onClick={() => close(true)}>

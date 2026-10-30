@@ -1,35 +1,65 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Bar, Cell, AreaChart, Area, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, Cell, AreaChart, Area, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api, { getUser } from '../api/client';
 import AIChat from '../components/AIChat';
 import AIInsights from '../components/AIInsights';
 import { formatINR } from '../hooks';
 import Icon from '../components/Icon';
-import { AnimatedNumber, Badge, Button, Card, EmptyState, ErrorText, Field, Input, PageHeader, Select, Skeleton } from '../components/ui';
+import { AnimatedNumber, Badge, Button, Card, EmptyState, ErrorText, Input, PageHeader, Select, Skeleton } from '../components/ui';
 
-const axisProps = { stroke: 'rgb(148 163 184 / 0.4)', tick: { fill: '#94a3b8', fontSize: 11 }, tickLine: false };
+// Chart colours are CSS variables from index.css, so they follow the light/dark theme
+const axisProps = { stroke: 'var(--line)', tick: { fill: 'var(--muted)', fontSize: 11 }, tickLine: false, axisLine: false };
 const tooltipProps = {
-  contentStyle: { background: 'rgb(15 23 42 / 0.9)', border: '1px solid rgb(255 255 255 / 0.12)', borderRadius: 12, backdropFilter: 'blur(12px)' },
-  labelStyle: { color: '#e2e8f0', fontWeight: 600 },
-  itemStyle: { color: '#cbd5e1' },
-  cursor: { fill: 'rgb(255 255 255 / 0.04)' },
+  contentStyle: { background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, boxShadow: '0 4px 16px rgb(15 23 42 / 0.08)', fontSize: 12 },
+  labelStyle: { color: 'var(--ink)', fontWeight: 600 },
+  itemStyle: { color: 'var(--ink-2)' },
+  cursor: { fill: 'var(--subtle)' },
+};
+const costColors = {
+  'Food cost': 'var(--chart-food)', Commission: 'var(--chart-commission)', 'GST on commission': 'var(--chart-gst)',
+  Discounts: 'var(--chart-discount)', Packaging: 'var(--chart-packaging)', Profit: 'var(--chart-profit)',
 };
 
-function Kpi({ label, icon, tone, value, format, delay }) {
+const marginTone = (pct) => (pct < 0 ? 'red' : pct < 20 ? 'amber' : 'green');
+const marginLabel = (pct) => (pct < 0 ? 'Loss' : pct < 20 ? 'Thin' : 'Healthy');
+
+function Kpi({ label, icon, value, format, valueClass = 'text-ink', footer, delay }) {
   return (
-    <Card hover delay={delay} className="group relative overflow-hidden p-5">
-      <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full blur-2xl opacity-40 transition duration-500 group-hover:opacity-70 ${tone.glow}`} />
-      <div className="relative flex items-start justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-        <span className={`rounded-xl p-2 ${tone.icon}`}><Icon name={icon} className="w-4 h-4" /></span>
+    <Card delay={delay} className="p-5">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</p>
+        <Icon name={icon} className="w-4 h-4 text-muted" />
       </div>
-      <p className={`relative mt-3 text-3xl font-bold tracking-tight ${tone.text}`}>
+      <p className={`mt-2 text-3xl font-extrabold tracking-tight ${valueClass}`}>
         <AnimatedNumber value={value} format={format} />
       </p>
+      <div className="mt-1.5 text-xs text-muted">{footer}</div>
     </Card>
   );
 }
+
+function ChartCard({ title, subtitle, delay, className = '', children }) {
+  return (
+    <Card delay={delay} className={`p-5 ${className}`}>
+      <h2 className="text-sm font-bold text-ink">{title}</h2>
+      {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
+      <div className="mt-4">{children}</div>
+    </Card>
+  );
+}
+
+function Legend({ items }) {
+  return (
+    <div className="flex items-center gap-4 text-xs font-medium text-ink-2">
+      {items.map(([label, color]) => (
+        <span key={label} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: color }} />{label}</span>
+      ))}
+    </div>
+  );
+}
+
+const filterSelect = 'w-auto! py-1.5 text-xs font-semibold';
 
 export default function Dashboard() {
   const user = getUser();
@@ -112,37 +142,34 @@ export default function Dashboard() {
     );
   }
 
+  const k = data?.kpis;
+  const perOrder = (v) => (k?.orderCount ? formatINR(v / k.orderCount) : '₹0');
+
   return (
     <>
       <PageHeader title={`${greeting}, ${user.name?.split(' ')[0]}`} subtitle="Profit after commission, GST, discounts, packaging and food cost." />
 
-      {/* Filters */}
-      <Card className="relative z-10 mb-6 grid grid-cols-2 gap-4 p-5 md:grid-cols-3 xl:grid-cols-5">
-        <Field label="Outlet">
-          <Select value={outletId} onChange={(e) => { setOutletId(e.target.value); setDishId(''); }}>
-            {(outlets || []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Platform">
-          <Select value={platformId} onChange={(e) => setPlatformId(e.target.value)}>
-            <option value="">All platforms</option>
-            {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Dish">
-          <Select value={dishId} onChange={(e) => setDishId(e.target.value)}>
-            <option value="">All dishes</option>
-            {dishes.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="From">
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </Field>
-        <Field label="To">
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </Field>
+      {/* Filter bar */}
+      <Card className="relative z-10 mb-6 flex flex-wrap items-center gap-2 px-4 py-3">
+        <Icon name="filter" className="mr-1 w-4 h-4 text-muted" />
+        <Select aria-label="Outlet" className={filterSelect} value={outletId} onChange={(e) => { setOutletId(e.target.value); setDishId(''); }}>
+          {(outlets || []).map((o) => <option key={o.id} value={o.id}>{o.name}{o.city ? ` · ${o.city}` : ''}</option>)}
+        </Select>
+        <Select aria-label="Platform" className={filterSelect} value={platformId} onChange={(e) => setPlatformId(e.target.value)}>
+          <option value="">All platforms</option>
+          {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </Select>
+        <Select aria-label="Dish" className={filterSelect} value={dishId} onChange={(e) => setDishId(e.target.value)}>
+          <option value="">All dishes</option>
+          {dishes.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </Select>
+        <div className="flex items-center gap-1.5">
+          <Input type="date" aria-label="From date" className={filterSelect} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <span className="text-xs text-muted">to</span>
+          <Input type="date" aria-label="To date" className={filterSelect} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        </div>
         {hasFilters && (
-          <button onClick={clearFilters} className="col-span-2 justify-self-start text-xs font-semibold text-emerald-300 hover:text-emerald-200 md:col-span-3 xl:col-span-5 animate-fade-in">
+          <button onClick={clearFilters} className="ml-auto text-xs font-semibold text-accent hover:underline animate-fade-in">
             Clear filters
           </button>
         )}
@@ -152,128 +179,118 @@ export default function Dashboard() {
 
       {!data ? (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32" />)}
           <Skeleton className="col-span-2 h-72" />
           <Skeleton className="col-span-2 h-72" />
         </div>
       ) : (
         <>
           {/* KPI cards */}
-          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Kpi label="Total revenue" icon="wallet" value={data.kpis.totalRevenue} format={formatINR} delay={0}
-              tone={{ glow: 'bg-cyan-500', icon: 'bg-cyan-400/10 text-cyan-300', text: 'text-white' }} />
-            <Kpi label="Net profit" icon="trend" value={data.kpis.totalProfit} format={formatINR} delay={60}
-              tone={data.kpis.totalProfit >= 0
-                ? { glow: 'bg-emerald-500', icon: 'bg-emerald-400/10 text-emerald-300', text: 'text-emerald-300' }
-                : { glow: 'bg-rose-500', icon: 'bg-rose-400/10 text-rose-300', text: 'text-rose-300' }} />
-            <Kpi label="Margin" icon="percent" value={data.kpis.marginPct} format={(v) => `${v.toFixed(1)}%`} delay={120}
-              tone={{ glow: 'bg-violet-500', icon: 'bg-violet-400/10 text-violet-300', text: 'text-white' }} />
-            <Kpi label="Orders" icon="bag" value={data.kpis.orderCount} format={(v) => Math.round(v)} delay={180}
-              tone={{ glow: 'bg-amber-500', icon: 'bg-amber-400/10 text-amber-300', text: 'text-white' }} />
+          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <Kpi label="Revenue" icon="wallet" value={k.totalRevenue} format={formatINR} delay={0}
+              footer={<>Avg order <span className="font-semibold text-ink-2">{perOrder(k.totalRevenue)}</span></>} />
+            <Kpi label="Net profit" icon="trend" value={k.totalProfit} format={formatINR} delay={50}
+              valueClass={k.totalProfit >= 0 ? 'text-ink' : 'text-bad'}
+              footer={<><span className="font-semibold text-ink-2">{perOrder(k.totalProfit)}</span> per order</>} />
+            <Kpi label="Net margin" icon="percent" value={k.marginPct} format={(v) => `${v.toFixed(1)}%`} delay={100}
+              valueClass={k.marginPct < 0 ? 'text-bad' : 'text-good'}
+              footer={<Badge tone={marginTone(k.marginPct)}>{marginLabel(k.marginPct)}</Badge>} />
+            <Kpi label="Orders" icon="bag" value={k.orderCount} format={(v) => Math.round(v)} delay={150}
+              footer={data.platformBreakdown.map((p) => `${p.platform_name} ${p.orders}`).join(' · ') || 'No orders yet'} />
           </div>
 
           <AIInsights outletId={outletId} filters={filters} />
 
-          {/* Charts */}
-          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card delay={200} className="p-5">
-              <h2 className="mb-4 font-semibold text-white">Profit by dish</h2>
-              {/* Horizontal bars so full dish names fit on the axis */}
-              <ResponsiveContainer width="100%" height={Math.max(250, data.dishBreakdown.length * 44)}>
-                <BarChart data={data.dishBreakdown} layout="vertical" margin={{ left: 10, right: 20 }}>
-                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" horizontal={false} />
-                  <XAxis type="number" tickFormatter={formatINR} {...axisProps} />
-                  <YAxis type="category" dataKey="dish_name" width={130} interval={0} {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
-                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
-                  <Bar dataKey="profit" name="Profit" radius={[0, 8, 8, 0]} animationDuration={900}>
-                    {data.dishBreakdown.map((d) => (
-                      <Cell key={d.dish_name} fill={d.profit >= 0 ? 'url(#profitBar)' : 'url(#lossBar)'} />
-                    ))}
-                  </Bar>
+          {/* Trend + cost split */}
+          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <ChartCard title="Revenue vs profit" subtitle="Daily totals for the selected filters" delay={150} className="lg:col-span-2">
+              <div className="-mt-9 mb-3 flex justify-end"><Legend items={[['Revenue', 'var(--chart-revenue)'], ['Profit', 'var(--chart-profit)']]} /></div>
+              <ResponsiveContainer width="100%" height={330}>
+                <AreaChart data={data.trend} margin={{ right: 8, left: -8 }}>
                   <defs>
-                    <linearGradient id="profitBar" x1="0" x2="1"><stop offset="0%" stopColor="#10b981" /><stop offset="100%" stopColor="#22d3ee" /></linearGradient>
-                    <linearGradient id="lossBar" x1="0" x2="1"><stop offset="0%" stopColor="#f43f5e" /><stop offset="100%" stopColor="#fb7185" /></linearGradient>
+                    <linearGradient id="profitFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--chart-profit)" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="var(--chart-profit)" stopOpacity={0} />
+                    </linearGradient>
                   </defs>
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-            <Card delay={260} className="p-5">
-              <h2 className="mb-4 font-semibold text-white">Profit trend</h2>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={data.trend} margin={{ right: 10 }}>
-                  <defs>
-                    <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#818cf8" stopOpacity={0.35} /><stop offset="100%" stopColor="#818cf8" stopOpacity={0} /></linearGradient>
-                    <linearGradient id="profitFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity={0.45} /><stop offset="100%" stopColor="#34d399" stopOpacity={0} /></linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" vertical={false} />
-                  <XAxis dataKey="date" {...axisProps} />
+                  <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis dataKey="date" {...axisProps} tickFormatter={(d) => d.slice(5)} />
                   <YAxis tickFormatter={formatINR} width={60} {...axisProps} />
-                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} cursor={{ stroke: 'rgb(255 255 255 / 0.2)' }} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
-                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#818cf8" strokeWidth={2} fill="url(#revFill)" animationDuration={1000} />
-                  <Area type="monotone" dataKey="profit" name="Profit" stroke="#34d399" strokeWidth={2.5} fill="url(#profitFill)" animationDuration={1000} />
+                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} cursor={{ stroke: 'var(--line)' }} />
+                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke="var(--chart-revenue)" strokeWidth={2} strokeDasharray="4 4" fill="none" animationDuration={800} />
+                  <Area type="monotone" dataKey="profit" name="Profit" stroke="var(--chart-profit)" strokeWidth={2.5} fill="url(#profitFill)" animationDuration={800} />
                 </AreaChart>
               </ResponsiveContainer>
-            </Card>
-          </div>
+            </ChartCard>
 
-          {/* Platform-wise and cost-wise analytics */}
-          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card delay={300} className="p-5">
-              <h2 className="font-semibold text-white">Profit by platform</h2>
-              <p className="mb-4 text-sm text-slate-400">Revenue vs what you keep, best margin first</p>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={data.platformBreakdown} margin={{ right: 10 }}>
-                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" vertical={false} />
-                  <XAxis dataKey="platform_name" {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
-                  <YAxis tickFormatter={formatINR} width={60} {...axisProps} />
-                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
-                  <Bar dataKey="revenue" name="Revenue" fill="#818cf8" fillOpacity={0.55} radius={[6, 6, 0, 0]} animationDuration={900} />
-                  <Bar dataKey="profit" name="Profit" fill="url(#profitBar)" radius={[6, 6, 0, 0]} animationDuration={900} />
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {data.platformBreakdown.map((p) => (
-                  <Badge key={p.platform_name} tone={p.marginPct < 10 ? 'red' : p.marginPct < 30 ? 'amber' : 'green'}>
-                    {p.platform_name}: {p.marginPct.toFixed(1)}% margin
-                  </Badge>
-                ))}
-              </div>
-            </Card>
-            <Card delay={340} className="p-5">
-              <h2 className="font-semibold text-white">Where the money goes</h2>
-              <p className="mb-4 text-sm text-slate-400">Share of revenue taken by each cost</p>
-              {(() => {
-                const revenue = data.kpis.totalRevenue;
-                const parts = data.costBreakdown.filter((c) => c.amount > 0);
-                const colors = { 'Food cost': '#a78bfa', Commission: '#fbbf24', 'GST on commission': '#fcd34d', Discounts: '#fb7185', Packaging: '#22d3ee', Profit: '#34d399' };
-                return revenue > 0 ? (
-                  <div className="grid items-center gap-4 sm:grid-cols-2">
-                    <ResponsiveContainer width="100%" height={220}>
+            <ChartCard title="Where the money goes" subtitle="Share of revenue taken by each cost" delay={200}>
+              {k.totalRevenue > 0 ? (
+                <>
+                  <div className="relative mx-auto h-44 w-44">
+                    <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={parts} dataKey="amount" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2} stroke="none" animationDuration={900}>
-                          {parts.map((c) => <Cell key={c.name} fill={colors[c.name]} />)}
+                        <Pie data={data.costBreakdown.filter((c) => c.amount > 0)} dataKey="amount" nameKey="name" innerRadius={58} outerRadius={80} paddingAngle={1.5} stroke="none" animationDuration={800}>
+                          {data.costBreakdown.filter((c) => c.amount > 0).map((c) => <Cell key={c.name} fill={costColors[c.name]} />)}
                         </Pie>
                         <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
                       </PieChart>
                     </ResponsiveContainer>
-                    <ul className="space-y-2 text-sm">
-                      {data.costBreakdown.map((c) => (
-                        <li key={c.name} className="flex items-center justify-between gap-3">
-                          <span className="flex items-center gap-2 text-slate-300">
-                            <span className="h-2.5 w-2.5 rounded-full" style={{ background: colors[c.name] }} />{c.name}
-                          </span>
-                          <span className={`font-semibold ${c.name === 'Profit' ? (c.amount >= 0 ? 'text-emerald-300' : 'text-rose-300') : 'text-slate-100'}`}>
-                            {formatINR(c.amount)} <span className="font-normal text-slate-500">{((c.amount / revenue) * 100).toFixed(1)}%</span>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-xl font-extrabold text-ink">₹{k.marginPct.toFixed(1)}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-good">kept per ₹100</span>
+                    </div>
                   </div>
-                ) : <p className="py-10 text-center text-slate-400">No orders in this range yet.</p>;
-              })()}
-            </Card>
+                  <ul className="mt-4 space-y-1.5 border-t border-line pt-4 text-xs">
+                    {data.costBreakdown.map((c) => (
+                      <li key={c.name} className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2 text-ink-2">
+                          <span className="h-2 w-2 rounded-full" style={{ background: costColors[c.name] }} />{c.name}
+                        </span>
+                        <span className={`font-semibold ${c.name === 'Profit' ? (c.amount >= 0 ? 'text-good' : 'text-bad') : 'text-ink'}`}>
+                          {formatINR(c.amount)} <span className="font-normal text-muted">{((c.amount / k.totalRevenue) * 100).toFixed(1)}%</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : <p className="py-10 text-center text-sm text-muted">No orders in this range yet.</p>}
+            </ChartCard>
+          </div>
+
+          {/* Dish + platform */}
+          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartCard title="Profit by dish" subtitle="Total profit per dish, losses in red" delay={250}>
+              <ResponsiveContainer width="100%" height={Math.max(220, data.dishBreakdown.length * 44)}>
+                <BarChart data={data.dishBreakdown} layout="vertical" margin={{ left: 0, right: 16 }}>
+                  <CartesianGrid stroke="var(--chart-grid)" horizontal={false} />
+                  <XAxis type="number" tickFormatter={formatINR} {...axisProps} />
+                  <YAxis type="category" dataKey="dish_name" width={130} interval={0} {...axisProps} tick={{ fill: 'var(--ink-2)', fontSize: 12 }} />
+                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
+                  <Bar dataKey="profit" name="Profit" radius={[0, 4, 4, 0]} barSize={18} animationDuration={800}>
+                    {data.dishBreakdown.map((d) => <Cell key={d.dish_name} fill={d.profit >= 0 ? 'var(--chart-profit)' : 'var(--chart-loss)'} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="Profit by platform" subtitle="Revenue vs what you keep, best margin first" delay={300}>
+              <div className="-mt-9 mb-3 flex justify-end"><Legend items={[['Revenue', 'var(--chart-revenue)'], ['Profit', 'var(--chart-profit)']]} /></div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={data.platformBreakdown} margin={{ right: 8, left: -8 }}>
+                  <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+                  <XAxis dataKey="platform_name" {...axisProps} tick={{ fill: 'var(--ink-2)', fontSize: 12 }} />
+                  <YAxis tickFormatter={formatINR} width={60} {...axisProps} />
+                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
+                  <Bar dataKey="revenue" name="Revenue" fill="var(--chart-revenue)" fillOpacity={0.45} radius={[4, 4, 0, 0]} barSize={28} animationDuration={800} />
+                  <Bar dataKey="profit" name="Profit" fill="var(--chart-profit)" radius={[4, 4, 0, 0]} barSize={28} animationDuration={800} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {data.platformBreakdown.map((p) => (
+                  <Badge key={p.platform_name} tone={marginTone(p.marginPct)}>{p.platform_name} · {p.marginPct.toFixed(1)}%</Badge>
+                ))}
+              </div>
+            </ChartCard>
           </div>
 
           {/* AI Assistant */}
@@ -282,39 +299,37 @@ export default function Dashboard() {
           </div>
 
           {/* Dish table, worst margin first */}
-          <Card delay={320} className="overflow-hidden">
-            <div className="border-b border-white/10 p-5">
-              <h2 className="font-semibold text-white">Dishes ranked by margin</h2>
-              <p className="text-sm text-slate-400">Worst performers first</p>
+          <Card delay={350} className="overflow-hidden">
+            <div className="border-b border-line px-5 py-4">
+              <h2 className="text-sm font-bold text-ink">Dishes ranked by margin</h2>
+              <p className="text-xs text-muted">Worst performers first</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="text-xs uppercase tracking-wider text-slate-400">
-                  <tr className="border-b border-white/5">
-                    <th className="px-5 py-3 text-left font-semibold">Dish</th>
-                    <th className="px-5 py-3 text-right font-semibold">Orders</th>
-                    <th className="px-5 py-3 text-right font-semibold">Revenue</th>
-                    <th className="px-5 py-3 text-right font-semibold">Profit</th>
-                    <th className="px-5 py-3 text-right font-semibold">Margin</th>
+                <thead className="bg-subtle text-[11px] uppercase tracking-wider text-muted">
+                  <tr className="border-b border-line">
+                    <th className="px-5 py-2.5 text-left font-bold">Dish</th>
+                    <th className="px-5 py-2.5 text-right font-bold">Orders</th>
+                    <th className="px-5 py-2.5 text-right font-bold">Revenue</th>
+                    <th className="px-5 py-2.5 text-right font-bold">Profit</th>
+                    <th className="px-5 py-2.5 text-right font-bold">Margin</th>
+                    <th className="px-5 py-2.5 text-right font-bold">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.dishBreakdown.map((d, i) => (
-                    <tr key={d.dish_name} style={{ animationDelay: `${i * 50}ms` }}
-                      className="border-b border-white/5 transition hover:bg-white/[0.04] animate-fade-up">
-                      <td className="px-5 py-3.5 font-medium text-slate-100">{d.dish_name}</td>
-                      <td className="px-5 py-3.5 text-right text-slate-300">{d.orders}</td>
-                      <td className="px-5 py-3.5 text-right text-slate-300">{formatINR(d.revenue)}</td>
-                      <td className={`px-5 py-3.5 text-right font-semibold ${d.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                        {formatINR(d.profit)}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <Badge tone={d.marginPct < 10 ? 'red' : d.marginPct < 20 ? 'amber' : 'green'}>{d.marginPct.toFixed(1)}%</Badge>
-                      </td>
+                    <tr key={d.dish_name} style={{ animationDelay: `${i * 40}ms` }}
+                      className="border-b border-line transition last:border-0 hover:bg-subtle animate-fade-up">
+                      <td className="px-5 py-3 font-semibold text-ink">{d.dish_name}</td>
+                      <td className="px-5 py-3 text-right text-ink-2">{d.orders}</td>
+                      <td className="px-5 py-3 text-right text-ink-2">{formatINR(d.revenue)}</td>
+                      <td className={`px-5 py-3 text-right font-bold ${d.profit >= 0 ? 'text-good' : 'text-bad'}`}>{formatINR(d.profit)}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-ink">{d.marginPct.toFixed(1)}%</td>
+                      <td className="px-5 py-3 text-right"><Badge tone={marginTone(d.marginPct)}>{marginLabel(d.marginPct)}</Badge></td>
                     </tr>
                   ))}
                   {data.dishBreakdown.length === 0 && (
-                    <tr><td colSpan="5" className="py-10 text-center text-slate-400">No orders in this range yet.</td></tr>
+                    <tr><td colSpan="6" className="py-10 text-center text-muted">No orders in this range yet.</td></tr>
                   )}
                 </tbody>
               </table>

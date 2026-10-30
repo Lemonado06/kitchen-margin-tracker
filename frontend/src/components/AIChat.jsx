@@ -68,16 +68,15 @@ export default function AIChat({ outletId, filters }) {
   }
 
   return (
-    <Card delay={280} className="relative flex h-[560px] flex-col overflow-hidden">
-      <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-violet-500/20 blur-3xl" />
-      <div className="relative flex items-center justify-between gap-3 border-b border-white/10 p-5">
+    <Card delay={280} className="flex h-[500px] flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
         <div className="flex items-center gap-3">
-          <span className="rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500 p-2 text-white shadow-lg shadow-violet-500/30">
+          <span className="rounded-lg bg-primary p-1.5 text-on-primary">
             <Icon name="sparkles" className="w-4 h-4" />
           </span>
           <div>
-            <h2 className="font-semibold text-white">Ask the assistant</h2>
-            <p className="text-sm text-slate-400">
+            <h2 className="text-sm font-bold text-ink">Ask the assistant</h2>
+            <p className="text-xs text-muted">
               Live order data · {activeFilters ? `${activeFilters} filter${activeFilters > 1 ? 's' : ''} applied` : 'all orders'}
             </p>
           </div>
@@ -87,26 +86,26 @@ export default function AIChat({ outletId, filters }) {
         )}
       </div>
 
-      <div ref={scrollRef} className="relative flex-1 space-y-4 overflow-y-auto p-5">
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto bg-canvas/50 p-5">
         {messages.map((m, i) => (
           <div key={i} className={`flex animate-fade-up ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className="max-w-[85%]">
               <div
-                className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
                   m.role === 'user'
-                    ? 'rounded-br-md bg-gradient-to-r from-emerald-500 to-cyan-500 font-medium text-slate-950 shadow-lg shadow-emerald-500/20'
-                    : 'rounded-bl-md border border-white/10 bg-white/[0.06] text-slate-100'
+                    ? 'rounded-br-sm bg-primary font-medium text-on-primary'
+                    : 'rounded-bl-sm border border-line bg-surface text-ink-2 shadow-sm'
                 }`}
               >
                 {m.role === 'user' ? m.text : <Markdown text={m.text} />}
               </div>
               {m.tools?.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
                   <Icon name="dashboard" className="w-3 h-3" />
                   {m.tools.map((t) => (
-                    <span key={t} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5">{toolLabels[t] || t}</span>
+                    <span key={t} className="rounded-md border border-line bg-surface px-1.5 py-0.5 font-medium text-ink-2">{toolLabels[t] || t}</span>
                   ))}
-                  {m.model && <span className="text-slate-500">· {m.model}</span>}
+                  {m.model && <span>· {m.model}</span>}
                 </div>
               )}
             </div>
@@ -114,11 +113,11 @@ export default function AIChat({ outletId, filters }) {
         ))}
         {loading && (
           <div className="flex justify-start animate-fade-in">
-            <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.06] px-4 py-3" aria-label="Thinking">
+            <div className="flex items-center gap-2 rounded-xl rounded-bl-sm border border-line bg-surface px-4 py-3" aria-label="Thinking">
               {[0, 150, 300].map((d) => (
-                <span key={d} style={{ animationDelay: `${d}ms` }} className="h-2 w-2 animate-bounce rounded-full bg-slate-300" />
+                <span key={d} style={{ animationDelay: `${d}ms` }} className="h-2 w-2 animate-bounce rounded-full bg-muted" />
               ))}
-              <span className="ml-1 text-xs text-slate-400">Checking your data…</span>
+              <span className="ml-1 text-xs text-muted">Checking your data…</span>
             </div>
           </div>
         )}
@@ -126,7 +125,7 @@ export default function AIChat({ outletId, filters }) {
           <div className="flex flex-wrap gap-2 pt-1">
             {suggestions.map((s, i) => (
               <button key={s} onClick={() => send(s)} style={{ animationDelay: `${300 + i * 70}ms` }}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:-translate-y-0.5 hover:border-emerald-400/40 hover:text-emerald-200 animate-fade-up">
+                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink-2 transition hover:border-accent hover:text-accent animate-fade-up">
                 {s}
               </button>
             ))}
@@ -135,12 +134,12 @@ export default function AIChat({ outletId, filters }) {
       </div>
 
       {error && (
-        <div className="mx-5 mb-2 flex items-center justify-between gap-2 rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+        <div className="mx-5 mb-2 flex items-center justify-between gap-2 rounded-lg border border-bad-line bg-bad-bg px-3 py-2 text-xs text-bad">
           <span>{error}</span>
         </div>
       )}
 
-      <form onSubmit={handleSend} className="relative flex gap-2 border-t border-white/10 p-4">
+      <form onSubmit={handleSend} className="flex gap-2 border-t border-line bg-surface p-4">
         <Input
           type="text"
           value={input}

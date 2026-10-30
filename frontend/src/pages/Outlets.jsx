@@ -82,7 +82,7 @@ export default function Outlets() {
 
       <EditingBanner show={!!editingId} />
       <Card as="form" onSubmit={handleSubmit}
-        className={`mb-8 flex flex-col gap-3 p-4 sm:flex-row ${editingId ? 'ring-2 ring-amber-400/60' : ''}`}>
+        className={`mb-8 flex flex-col gap-3 p-4 sm:flex-row ${editingId ? 'ring-2 ring-warn' : ''}`}>
         <Input type="text" placeholder="Outlet name" value={name} onChange={(e) => setName(e.target.value)} required />
         <Input type="text" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
         <div className="flex gap-2">
@@ -105,22 +105,22 @@ export default function Outlets() {
             <Card key={outlet.id} hover delay={i * 70} className="group flex flex-col p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 text-emerald-300 ring-1 ring-white/10 transition duration-300 group-hover:scale-110 group-hover:rotate-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-subtle text-ink-2">
                     <Icon name="store" />
                   </div>
                   <div>
-                    <p className="font-semibold text-white">{outlet.name}</p>
+                    <p className="font-semibold text-ink">{outlet.name}</p>
                     {outlet.city && (
-                      <p className="flex items-center gap-1 text-xs text-slate-400"><Icon name="pin" className="w-3 h-3" />{outlet.city}</p>
+                      <p className="flex items-center gap-1 text-xs text-muted"><Icon name="pin" className="w-3 h-3" />{outlet.city}</p>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-1 opacity-70 transition group-hover:opacity-100">
-                  <button onClick={() => startEdit(outlet)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="Edit outlet">
+                  <button onClick={() => startEdit(outlet)} className="rounded-lg p-1.5 text-muted transition hover:bg-subtle hover:text-ink" aria-label="Edit outlet">
                     <Icon name="edit" className="w-4 h-4" />
                   </button>
                   {isOwner() && (
-                    <button onClick={() => handleDelete(outlet)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300" aria-label="Delete outlet">
+                    <button onClick={() => handleDelete(outlet)} className="rounded-lg p-1.5 text-muted transition hover:bg-bad-bg hover:text-bad" aria-label="Delete outlet">
                       <Icon name="trash" className="w-4 h-4" />
                     </button>
                   )}
@@ -129,7 +129,7 @@ export default function Outlets() {
               <div className="mt-auto grid grid-cols-3 gap-2">
                 {links.map((l) => (
                   <Link key={l.to} to={`/outlets/${outlet.id}/${l.to}`}
-                    className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-medium text-slate-300 transition hover:-translate-y-0.5 hover:border-emerald-400/40 hover:bg-emerald-400/10 hover:text-emerald-200">
+                    className="flex flex-col items-center gap-1 rounded-lg border border-line bg-surface py-2.5 text-xs font-semibold text-ink-2 transition hover:border-ink/30 hover:bg-subtle hover:text-ink">
                     <Icon name={l.icon} className="w-4 h-4" />
                     {l.label}
                   </Link>

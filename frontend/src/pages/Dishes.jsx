@@ -85,7 +85,7 @@ export default function Dishes() {
 
       <EditingBanner show={!!editingId} />
       <Card as="form" onSubmit={handleSubmit}
-        className={`mb-6 flex flex-col gap-3 p-4 sm:flex-row ${editingId ? 'ring-2 ring-amber-400/60' : ''}`}>
+        className={`mb-6 flex flex-col gap-3 p-4 sm:flex-row ${editingId ? 'ring-2 ring-warn' : ''}`}>
         <Input type="text" placeholder="Dish name" value={name} onChange={(e) => setName(e.target.value)} required />
         <Input type="number" placeholder="Price (₹)" min="0.01" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className="sm:w-40" required />
         <div className="flex gap-2">
@@ -105,13 +105,13 @@ export default function Dishes() {
           {dishes.map((dish, i) => {
             const open = openRecipeId === dish.id;
             return (
-              <Card key={dish.id} delay={i * 50} className={`p-4 transition duration-300 ${open ? 'border-emerald-400/30' : 'hover:border-white/20'}`}>
+              <Card key={dish.id} delay={i * 50} className={`p-4 transition duration-300 ${open ? 'border-ink/30' : 'hover:border-ink/20'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-amber-300 ring-1 ring-white/10"><Icon name="chef" className="w-4 h-4" /></div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-subtle text-warn ring-1 ring-line"><Icon name="chef" className="w-4 h-4" /></div>
                     <div>
-                      <p className="font-semibold text-white">{dish.name}</p>
-                      <p className="text-sm text-slate-400">{formatINR(dish.price)}</p>
+                      <p className="font-semibold text-ink">{dish.name}</p>
+                      <p className="text-sm text-muted">{formatINR(dish.price)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
