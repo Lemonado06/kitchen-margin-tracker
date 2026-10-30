@@ -4,7 +4,7 @@
 |---|---|
 | `KitchenMarginTracker.postman_collection.json` | 64 requests in 11 folders, each with tests, a description and a saved example response |
 | `KitchenMarginTracker.local.postman_environment.json` | Sets `baseUrl` to `http://localhost:5000` |
-| `report/test-report.html` | HTML report of the last full run (64 requests, 96 assertions, 0 failures). Open it in a browser |
+| `report/test-report.html` | HTML report of the last full run (64 requests, 94 assertions, 0 failures; the exact assertion count depends on whether Gemini answered the AI requests). Open it in a browser |
 
 ## Run it in Postman
 

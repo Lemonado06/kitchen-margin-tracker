@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Bar, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, Cell, AreaChart, Area, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import api, { getUser } from '../api/client';
 import AIChat from '../components/AIChat';
 import AIInsights from '../components/AIInsights';
@@ -214,6 +214,65 @@ export default function Dashboard() {
                   <Area type="monotone" dataKey="profit" name="Profit" stroke="#34d399" strokeWidth={2.5} fill="url(#profitFill)" animationDuration={1000} />
                 </AreaChart>
               </ResponsiveContainer>
+            </Card>
+          </div>
+
+          {/* Platform-wise and cost-wise analytics */}
+          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card delay={300} className="p-5">
+              <h2 className="font-semibold text-white">Profit by platform</h2>
+              <p className="mb-4 text-sm text-slate-400">Revenue vs what you keep, best margin first</p>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={data.platformBreakdown} margin={{ right: 10 }}>
+                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" vertical={false} />
+                  <XAxis dataKey="platform_name" {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
+                  <YAxis tickFormatter={formatINR} width={60} {...axisProps} />
+                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
+                  <Bar dataKey="revenue" name="Revenue" fill="#818cf8" fillOpacity={0.55} radius={[6, 6, 0, 0]} animationDuration={900} />
+                  <Bar dataKey="profit" name="Profit" fill="url(#profitBar)" radius={[6, 6, 0, 0]} animationDuration={900} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {data.platformBreakdown.map((p) => (
+                  <Badge key={p.platform_name} tone={p.marginPct < 10 ? 'red' : p.marginPct < 30 ? 'amber' : 'green'}>
+                    {p.platform_name}: {p.marginPct.toFixed(1)}% margin
+                  </Badge>
+                ))}
+              </div>
+            </Card>
+            <Card delay={340} className="p-5">
+              <h2 className="font-semibold text-white">Where the money goes</h2>
+              <p className="mb-4 text-sm text-slate-400">Share of revenue taken by each cost</p>
+              {(() => {
+                const revenue = data.kpis.totalRevenue;
+                const parts = data.costBreakdown.filter((c) => c.amount > 0);
+                const colors = { 'Food cost': '#a78bfa', Commission: '#fbbf24', 'GST on commission': '#fcd34d', Discounts: '#fb7185', Packaging: '#22d3ee', Profit: '#34d399' };
+                return revenue > 0 ? (
+                  <div className="grid items-center gap-4 sm:grid-cols-2">
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie data={parts} dataKey="amount" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2} stroke="none" animationDuration={900}>
+                          {parts.map((c) => <Cell key={c.name} fill={colors[c.name]} />)}
+                        </Pie>
+                        <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <ul className="space-y-2 text-sm">
+                      {data.costBreakdown.map((c) => (
+                        <li key={c.name} className="flex items-center justify-between gap-3">
+                          <span className="flex items-center gap-2 text-slate-300">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ background: colors[c.name] }} />{c.name}
+                          </span>
+                          <span className={`font-semibold ${c.name === 'Profit' ? (c.amount >= 0 ? 'text-emerald-300' : 'text-rose-300') : 'text-slate-100'}`}>
+                            {formatINR(c.amount)} <span className="font-normal text-slate-500">{((c.amount / revenue) * 100).toFixed(1)}%</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : <p className="py-10 text-center text-slate-400">No orders in this range yet.</p>;
+              })()}
             </Card>
           </div>
 

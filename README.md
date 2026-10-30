@@ -68,7 +68,7 @@ Code: [backend/ai.js](backend/ai.js) (routes, prompts, model fallback) and [back
 
 ## API testing with Postman
 
-[postman/](postman/) has a collection of **64 requests in 11 folders**, each with tests, a description and a saved example response, plus an environment file and an HTML report of the last run (96 assertions, 0 failures). See [postman/README.md](postman/README.md) for how to run it in Postman or with `npx newman`.
+[postman/](postman/) has a collection of **64 requests in 11 folders**, each with tests, a description and a saved example response, plus an environment file and an HTML report of the last run (64 requests, 0 failures). See [postman/README.md](postman/README.md) for how to run it in Postman or with `npx newman`.
 
 ## UI
 
