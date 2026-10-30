@@ -90,51 +90,51 @@ export default function Team() {
           {!team
             ? [0, 1].map((i) => <Skeleton key={i} className="h-20" />)
             : team.map((member, i) => (
-              <Card key={member.id} delay={i * 70} className="group flex items-center justify-between gap-3 p-4 transition hover:border-white/20">
+              <Card key={member.id} delay={i * 70} className="group flex items-center justify-between gap-3 p-4 transition hover:border-ink/20">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold text-white bg-gradient-to-br ${member.role === 'owner' ? 'from-violet-400 to-indigo-500' : 'from-cyan-400 to-emerald-500'}`}>
+                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${member.role === 'owner' ? 'bg-primary text-on-primary' : 'border border-line bg-subtle text-ink'}`}>
                     {member.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 font-semibold text-white">{member.name} <RoleBadge role={member.role} /></p>
-                    <p className="truncate text-sm text-slate-400">{member.email}</p>
+                    <p className="flex items-center gap-2 font-semibold text-ink">{member.name} <RoleBadge role={member.role} /></p>
+                    <p className="truncate text-sm text-muted">{member.email}</p>
                   </div>
                 </div>
                 {member.role === 'manager' ? (
                   <div className="flex gap-1 opacity-70 transition group-hover:opacity-100">
-                    <button onClick={() => openEdit(member)} className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label={`Edit ${member.name}`}>
+                    <button onClick={() => openEdit(member)} className="rounded-lg p-2 text-muted transition hover:bg-subtle hover:text-ink" aria-label={`Edit ${member.name}`}>
                       <Icon name="edit" className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleRemove(member)} className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300" aria-label={`Remove ${member.name}`}>
+                    <button onClick={() => handleRemove(member)} className="rounded-lg p-2 text-muted transition hover:bg-bad-bg hover:text-bad" aria-label={`Remove ${member.name}`}>
                       <Icon name="trash" className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs text-slate-500">You</span>
+                  <span className="text-xs text-muted">You</span>
                 )}
               </Card>
             ))}
           {team && team.length === 1 && (
-            <p className="px-1 pt-2 text-sm text-slate-400 animate-fade-in">No managers yet. Add one to share your outlets with your staff.</p>
+            <p className="px-1 pt-2 text-sm text-muted animate-fade-in">No managers yet. Add one to share your outlets with your staff.</p>
           )}
         </div>
 
         <Card delay={150} className="h-fit overflow-hidden lg:col-span-2">
-          <div className="flex items-center gap-2 border-b border-white/10 p-5">
-            <Icon name="shield" className="w-5 h-5 text-emerald-300" />
-            <h2 className="font-semibold text-white">Role permissions</h2>
+          <div className="flex items-center gap-2 border-b border-line p-5">
+            <Icon name="shield" className="w-5 h-5 text-good" />
+            <h2 className="font-semibold text-ink">Role permissions</h2>
           </div>
           <table className="w-full text-sm">
-            <thead className="text-xs uppercase tracking-wider text-slate-400">
+            <thead className="text-xs uppercase tracking-wider text-muted">
               <tr><th className="px-5 py-2.5 text-left font-semibold">Action</th><th className="px-2 py-2.5 font-semibold">Owner</th><th className="px-5 py-2.5 font-semibold">Manager</th></tr>
             </thead>
             <tbody>
               {permissions.map(([action, owner, manager]) => (
-                <tr key={action} className="border-t border-white/5">
-                  <td className="px-5 py-2.5 text-slate-300">{action}</td>
+                <tr key={action} className="border-t border-line">
+                  <td className="px-5 py-2.5 text-ink-2">{action}</td>
                   {[owner, manager].map((allowed, i) => (
                     <td key={i} className="px-2 py-2.5 text-center last:pr-5">
-                      <Icon name={allowed ? 'check' : 'x'} className={`mx-auto w-4 h-4 ${allowed ? 'text-emerald-300' : 'text-slate-600'}`} />
+                      <Icon name={allowed ? 'check' : 'x'} className={`mx-auto w-4 h-4 ${allowed ? 'text-good' : 'text-muted/50'}`} />
                     </td>
                   ))}
                 </tr>

@@ -25,11 +25,11 @@ export default function OutletTabs({ outletId, title, subtitle }) {
         title={title}
         subtitle={subtitle}
       />
-      <div className="glass mb-6 inline-flex gap-1 rounded-2xl p-1.5 animate-fade-up">
+      <div className="mb-6 inline-flex gap-1 rounded-lg border border-line bg-surface p-1 shadow-sm animate-fade-up">
         {tabs.map((t) => (
           <NavLink key={t.to} to={`/outlets/${outletId}/${t.to}`}
-            className={({ isActive }) => `flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition duration-200 ${
-              isActive ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-500/20' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+            className={({ isActive }) => `flex items-center gap-2 rounded-md px-3.5 py-1.5 text-sm font-medium transition duration-150 ${
+              isActive ? 'bg-primary text-on-primary' : 'text-ink-2 hover:bg-subtle hover:text-ink'
             }`}>
             <Icon name={t.icon} className="w-4 h-4" />
             {t.label}

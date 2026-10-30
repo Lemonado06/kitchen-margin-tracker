@@ -52,20 +52,20 @@ export default function Profile() {
       ) : (
         <div className="grid max-w-4xl gap-6 md:grid-cols-5">
           <Card className="flex flex-col items-center p-6 text-center md:col-span-2">
-            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 text-3xl font-bold text-white shadow-xl shadow-violet-500/30 animate-scale-in">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary text-3xl font-bold text-on-primary animate-scale-in">
               {me.name.charAt(0).toUpperCase()}
             </div>
-            <p className="text-lg font-semibold text-white">{me.name}</p>
-            <p className="mb-3 text-sm text-slate-400">{me.email}</p>
+            <p className="text-lg font-semibold text-ink">{me.name}</p>
+            <p className="mb-3 text-sm text-muted">{me.email}</p>
             <RoleBadge role={me.role} />
-            {me.owner_name && <p className="mt-4 text-xs text-slate-400">Manager for <span className="font-semibold text-slate-200">{me.owner_name}</span>'s outlets</p>}
+            {me.owner_name && <p className="mt-4 text-xs text-muted">Manager for <span className="font-semibold text-ink">{me.owner_name}</span>'s outlets</p>}
           </Card>
 
           <Card as="form" onSubmit={handleSubmit} delay={80} className="space-y-4 p-6 md:col-span-3">
             <ErrorText>{error}</ErrorText>
             <Field label="Name"><Input value={name} onChange={(e) => setName(e.target.value)} required /></Field>
-            <div className="flex items-center gap-2 pt-2 text-sm font-semibold text-slate-200">
-              <Icon name="key" className="w-4 h-4 text-emerald-300" /> Change password
+            <div className="flex items-center gap-2 pt-2 text-sm font-semibold text-ink">
+              <Icon name="key" className="w-4 h-4 text-good" /> Change password
             </div>
             <Field label="Current password"><PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} /></Field>
             <Field label="New password" hint="Leave both blank to keep your current password">

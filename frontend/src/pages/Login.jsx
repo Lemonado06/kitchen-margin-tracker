@@ -38,8 +38,8 @@ export default function Login() {
         <Button type="submit" size="lg" loading={loading} icon="arrowRight" className="w-full">
           Log in
         </Button>
-        <p className="pt-2 text-center text-sm text-slate-400">
-          New here? <Link to="/register" className="font-semibold text-emerald-300 hover:text-emerald-200">Create an owner account</Link>
+        <p className="pt-2 text-center text-sm text-muted">
+          New here? <Link to="/register" className="font-semibold text-good hover:text-good">Create an owner account</Link>
         </p>
       </form>
     </AuthShell>

@@ -120,7 +120,7 @@ export default function Orders() {
 
       <EditingBanner show={!!editingId} />
       <Card as="form" onSubmit={handleSubmit}
-        className={`mb-6 grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 ${editingId ? 'ring-2 ring-amber-400/60' : ''}`}>
+        className={`mb-6 grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 ${editingId ? 'ring-2 ring-warn' : ''}`}>
         <Field label="Dish">
           <Select value={dishId} onChange={(e) => setDishId(e.target.value)} required>
             <option value="">Select dish</option>
@@ -163,14 +163,14 @@ export default function Orders() {
         <div className="space-y-2">
           {orders.map((order, i) => (
             <Card key={order.id} delay={Math.min(i, 12) * 40}
-              className="group flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition hover:border-white/20 hover:bg-white/[0.07]">
+              className="group flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition hover:border-ink/20 hover:bg-subtle">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-cyan-300 ring-1 ring-white/10"><Icon name="receipt" className="w-4 h-4" /></div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-subtle text-info ring-1 ring-line"><Icon name="receipt" className="w-4 h-4" /></div>
                 <div>
-                  <p className="flex flex-wrap items-center gap-2 font-semibold text-white">
+                  <p className="flex flex-wrap items-center gap-2 font-semibold text-ink">
                     {order.dish_name} <Badge tone={platformTone[order.platform_name] || 'slate'}>{order.platform_name}</Badge>
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted">
                     {showDate(order.order_date)}
                     {order.discount_amount > 0 && ` · ₹${order.discount_amount} discount`}
                     {order.packaging_cost > 0 && ` · ₹${order.packaging_cost} packaging`}
@@ -178,12 +178,12 @@ export default function Orders() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <p className="mr-2 text-base font-semibold text-white">{formatINR(order.order_value)}</p>
-                <button onClick={() => startEdit(order)} className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="Edit order">
+                <p className="mr-2 text-base font-semibold text-ink">{formatINR(order.order_value)}</p>
+                <button onClick={() => startEdit(order)} className="rounded-lg p-2 text-muted transition hover:bg-subtle hover:text-ink" aria-label="Edit order">
                   <Icon name="edit" className="w-4 h-4" />
                 </button>
                 {isOwner() && (
-                  <button onClick={() => handleDelete(order)} className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300" aria-label="Delete order">
+                  <button onClick={() => handleDelete(order)} className="rounded-lg p-2 text-muted transition hover:bg-bad-bg hover:text-bad" aria-label="Delete order">
                     <Icon name="trash" className="w-4 h-4" />
                   </button>
                 )}

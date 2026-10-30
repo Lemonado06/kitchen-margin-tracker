@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 
 // Fetches data when `deps` change; call reload() after a create/update/delete to fetch again.
 // Returns [data, reload, error]; data is null until the first response arrives.
@@ -30,4 +30,23 @@ export function useConfirm() {
   return useContext(FeedbackContext).confirm;
 }
 
-export const formatINR = (n) => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+// Light/dark theme: the .dark class on <html> drives the colours (index.css); index.html sets it before first paint
+const themeListeners = new Set();
+const currentTheme = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
+function setTheme(theme) {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  try { localStorage.setItem('theme', theme); } catch { /* private mode: the choice just isn't remembered */ }
+  themeListeners.forEach((listener) => listener());
+}
+
+// Every toggle on screen shares this one setting
+export function useTheme() {
+  const theme = useSyncExternalStore((listener) => {
+    themeListeners.add(listener);
+    return () => themeListeners.delete(listener);
+  }, currentTheme);
+  return [theme, () => setTheme(theme === 'dark' ? 'light' : 'dark')];
+}
+
+export const formatINR =(n) => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
