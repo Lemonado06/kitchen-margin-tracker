@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('./middleware');
+const { requireAuth, requireRole } = require('./middleware');
+const { FeeRule, Platform } = require('./models');
+const { validId, outletFor, feeRuleFor } = require('./access');
 
-module.exports = (pool) => {
-  async function verifyOutletOwnership(outletId, userId) {
-    const result = await pool.query('SELECT id FROM outlets WHERE id = $1 AND owner_id = $2', [outletId, userId]);
-    return result.rows.length > 0;
+module.exports = () => {
+  function validPct(value) {
+    return value == null || (!isNaN(value) && value >= 0 && value <= 100);
   }
 
   // CREATE fee rule
@@ -14,34 +15,67 @@ module.exports = (pool) => {
     if (!outlet_id || !platform_id || commission_pct == null) {
       return res.status(400).json({ error: 'outlet_id, platform_id, commission_pct are required' });
     }
-    const owns = await verifyOutletOwnership(outlet_id, req.user.id);
-    if (!owns) return res.status(403).json({ error: 'You do not own this outlet' });
-
+    if (!validPct(commission_pct) || !validPct(gst_on_commission_pct)) {
+      return res.status(400).json({ error: 'Percentages must be between 0 and 100' });
+    }
     try {
-      const result = await pool.query(
-        `INSERT INTO platform_fee_rules (outlet_id, platform_id, commission_pct, gst_on_commission_pct)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        gst_on_commission_pct != null ? gst_on_commission_pct : 18
-      );
-      res.status(201).json(result.rows[0]);
+      if (!(await outletFor(outlet_id, req.user))) return res.status(403).json({ error: 'You do not own this outlet' });
+      if (!validId(platform_id) || !(await Platform.exists({ _id: platform_id }))) {
+        return res.status(400).json({ error: 'Platform not found' });
+      }
+      if (await FeeRule.exists({ outlet_id, platform_id })) {
+        return res.status(409).json({ error: 'A fee rule for this platform already exists. Edit it instead.' });
+      }
+      const rule = await FeeRule.create({
+        outlet_id,
+        platform_id,
+        commission_pct,
+        gst_on_commission_pct: gst_on_commission_pct != null ? gst_on_commission_pct : 18,
+      });
+      res.status(201).json(rule);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // GET fee rules for an outlet
+  // GET fee rules for an outlet, with the platform name
   router.get('/outlet/:outletId', requireAuth, async (req, res) => {
-    const owns = await verifyOutletOwnership(req.params.outletId, req.user.id);
-    if (!owns) return res.status(403).json({ error: 'You do not own this outlet' });
-
     try {
-      const result = await pool.query(
-        `SELECT pfr.*, p.name as platform_name FROM platform_fee_rules pfr
-         JOIN platforms p ON pfr.platform_id = p.id
-         WHERE pfr.outlet_id = $1`,
-        [req.params.outletId]
-      );
-      res.json(result.rows);
+      if (!(await outletFor(req.params.outletId, req.user))) return res.status(403).json({ error: 'You do not own this outlet' });
+      const rules = await FeeRule.find({ outlet_id: req.params.outletId }).populate('platform_id', 'name');
+      res.json(rules
+        .map((r) => ({ ...r.toJSON(), platform_id: r.platform_id.id, platform_name: r.platform_id.name }))
+        .sort((a, b) => a.platform_name.localeCompare(b.platform_name)));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // UPDATE fee rule
+  router.put('/:id', requireAuth, async (req, res) => {
+    const { commission_pct, gst_on_commission_pct } = req.body;
+    if (commission_pct == null || !validPct(commission_pct) || !validPct(gst_on_commission_pct)) {
+      return res.status(400).json({ error: 'commission_pct is required and percentages must be between 0 and 100' });
+    }
+    try {
+      const rule = await feeRuleFor(req.params.id, req.user);
+      if (!rule) return res.status(404).json({ error: 'Fee rule not found' });
+      rule.commission_pct = commission_pct;
+      rule.gst_on_commission_pct = gst_on_commission_pct != null ? gst_on_commission_pct : 18;
+      await rule.save();
+      res.json(rule);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE fee rule (owners only)
+  router.delete('/:id', requireAuth, requireRole('owner'), async (req, res) => {
+    try {
+      const rule = await feeRuleFor(req.params.id, req.user);
+      if (!rule) return res.status(404).json({ error: 'Fee rule not found' });
+      await rule.deleteOne();
+      res.json({ deleted: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

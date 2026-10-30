@@ -1,53 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('./middleware');
+const { getMarginsData } = require('./aiTools');
+const { outletFor } = require('./access');
 
-module.exports = (pool) => {
-  async function verifyOutletOwnership(outletId, userId) {
-    const result = await pool.query('SELECT id FROM outlets WHERE id = $1 AND owner_id = $2', [outletId, userId]);
-    return result.rows.length > 0;
-  }
-
+module.exports = () => {
   router.get('/margins', requireAuth, async (req, res) => {
     const { outlet_id, platform_id, dish_id, date_from, date_to } = req.query;
     if (!outlet_id) return res.status(400).json({ error: 'outlet_id is required' });
 
-    const owns = await verifyOutletOwnership(outlet_id, req.user.id);
-    if (!owns) return res.status(403).json({ error: 'You do not own this outlet' });
-
     try {
-      let query = `
-        SELECT o.id, o.order_date, o.order_value, o.discount_amount, o.packaging_cost,
-               d.id as dish_id, d.name as dish_name,
-               p.name as platform_name,
-               pfr.commission_pct, pfr.gst_on_commission_pct,
-               COALESCE((SELECT SUM(ri.cost) FROM recipe_items ri WHERE ri.dish_id = d.id), 0) as food_cost
-        FROM orders o
-        JOIN dishes d ON o.dish_id = d.id
-        JOIN platforms p ON o.platform_id = p.id
-        JOIN platform_fee_rules pfr ON pfr.outlet_id = o.outlet_id AND pfr.platform_id = o.platform_id
-        WHERE o.outlet_id = $1
-      `;
-      const params = [outlet_id];
+      if (!(await outletFor(outlet_id, req.user))) return res.status(403).json({ error: 'You do not own this outlet' });
 
-      if (platform_id) { params.push(platform_id); query += ` AND o.platform_id = $${params.length}`; }
-      if (dish_id) { params.push(dish_id); query += ` AND o.dish_id = $${params.length}`; }
-      if (date_from) { params.push(date_from); query += ` AND o.order_date >= $${params.length}`; }
-      if (date_to) { params.push(date_to); query += ` AND o.order_date <= $${params.length}`; }
-
-      const result = await pool.query(query, params);
-
-      // Compute profit per order
-      const rows = result.rows.map(r => {
-        const orderValue = parseFloat(r.order_value);
-        const commission = orderValue * (parseFloat(r.commission_pct) / 100);
-        const gstOnCommission = commission * (parseFloat(r.gst_on_commission_pct) / 100);
-        const foodCost = parseFloat(r.food_cost);
-        const discount = parseFloat(r.discount_amount);
-        const packaging = parseFloat(r.packaging_cost);
-        const profit = orderValue - commission - gstOnCommission - discount - packaging - foodCost;
-        return { ...r, profit, orderValue };
-      });
+      // Profit per order (shared with the AI tools so both always agree)
+      const rows = await getMarginsData(outlet_id, { platform_id, dish_id, date_from, date_to });
 
       // KPIs
       const totalRevenue = rows.reduce((s, r) => s + r.orderValue, 0);
@@ -70,7 +36,7 @@ module.exports = (pool) => {
       // Group by date (for trend line)
       const byDate = {};
       rows.forEach(r => {
-        const date = new Date(r.order_date).toISOString().split('T')[0];
+        const date = r.order_date; // already YYYY-MM-DD
         if (!byDate[date]) byDate[date] = { date, revenue: 0, profit: 0 };
         byDate[date].revenue += r.orderValue;
         byDate[date].profit += r.profit;
