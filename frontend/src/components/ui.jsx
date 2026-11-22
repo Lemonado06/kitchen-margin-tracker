@@ -104,7 +104,9 @@ export function Badge({ tone = 'slate', children }) {
 }
 
 export function RoleBadge({ role }) {
-  return <Badge tone={role === 'owner' ? 'violet' : 'cyan'}>{role === 'owner' ? 'Owner' : 'Manager'}</Badge>;
+  const roles = { owner: ['violet', 'Owner'], manager: ['cyan', 'Manager'], staff: ['amber', 'Staff'] };
+  const [tone, label] = roles[role] || ['slate', role];
+  return <Badge tone={tone}>{label}</Badge>;
 }
 
 export function Spinner({ className = 'w-5 h-5' }) {

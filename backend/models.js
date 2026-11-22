@@ -23,13 +23,13 @@ function schema(fields, extraToJSON) {
 
 const ref = (model, required = true) => ({ type: Schema.Types.ObjectId, ref: model, required, index: true });
 
-// Owners sign up themselves; managers are added by an owner and work on that owner's outlets
+// Owners sign up themselves; managers and kitchen staff are added by an owner and work on that owner's outlets
 const userSchema = schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password_hash: { type: String, required: true },
-  role: { type: String, enum: ['owner', 'manager'], required: true },
-  owner_id: ref('User', false), // set for managers only
+  role: { type: String, enum: ['owner', 'manager', 'staff'], required: true },
+  owner_id: ref('User', false), // set for managers and staff
 }, (ret) => { delete ret.password_hash; });
 
 const outletSchema = schema({

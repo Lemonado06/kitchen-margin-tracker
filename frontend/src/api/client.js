@@ -45,3 +45,18 @@ export function logout() {
 }
 
 export default api;
+
+export const canViewProfit = (user) => {
+  return user?.role === 'owner' || user?.role === 'manager';
+};
+
+export const isStaff = (user) => {
+  return user?.role === 'staff';
+};
+
+export function homePath(user = getUser()) {
+  if (user?.role === 'staff') return '/outlets';
+  if (user?.role === 'manager') return '/dashboard';
+  if (user?.role === 'owner') return '/dashboard';
+  return '/login';
+}

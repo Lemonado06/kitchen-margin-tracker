@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Icon from './Icon';
 import { RoleBadge } from './ui';
-import { getUser, isOwner, logout } from '../api/client';
+import { canViewProfit, getUser, isOwner, logout } from '../api/client';
 
 // Animated gradient blobs behind the glass panels
 export function Backdrop() {
@@ -22,8 +22,7 @@ function NavItem({ to, icon, label, onClick }) {
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-200 ${
-          isActive ? 'bg-white/10 text-white shadow-inner shadow-white/5' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+        `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-200 ${isActive ? 'bg-white/10 text-white shadow-inner shadow-white/5' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
         }`
       }
     >
@@ -64,7 +63,7 @@ export default function Layout() {
 
       <nav className="flex flex-1 flex-col gap-1">
         <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Menu</p>
-        <NavItem to="/dashboard" icon="dashboard" label="Dashboard" onClick={close} />
+        {canViewProfit(user) && <NavItem to="/dashboard" icon="dashboard" label="Dashboard" onClick={close} />}
         <NavItem to="/outlets" icon="store" label="Outlets" onClick={close} />
         {isOwner() && <NavItem to="/team" icon="users" label="Team" onClick={close} />}
         <NavItem to="/profile" icon="user" label="Profile" onClick={close} />

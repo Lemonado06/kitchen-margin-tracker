@@ -9,18 +9,18 @@ const tones = {
   tip: { icon: 'sparkles', box: 'border-violet-400/20 bg-violet-500/[0.07]', chip: 'bg-violet-500/15 text-violet-300' },
 };
 
-// One-click AI summary of the dashboard's current (filtered) numbers
-export default function AIInsights({ outletId, filters }) {
+// One-click AI summary of the dashboard's current (filtered) numbers, for one or several outlets
+export default function AIInsights({ outletIds, filters }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const filterKey = JSON.stringify([outletId, filters]);
+  const filterKey = JSON.stringify([outletIds, filters]);
 
   async function generate() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post('/ai/insights', { outlet_id: outletId, filters });
+      const res = await api.post('/ai/insights', { outlet_ids: outletIds, filters });
       setResult({ ...res.data, key: filterKey });
     } catch (err) {
       setError(err.response?.data?.error || 'Could not generate insights');

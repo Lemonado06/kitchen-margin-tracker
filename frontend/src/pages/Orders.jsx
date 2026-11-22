@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import api, { isOwner } from '../api/client';
+import api, { isOwner, isStaff } from '../api/client';
 import OutletTabs from '../components/OutletTabs';
 import Icon from '../components/Icon';
 import { formatINR, useConfirm, useLoad, useToast } from '../hooks';
@@ -179,9 +179,11 @@ export default function Orders() {
               </div>
               <div className="flex items-center gap-2">
                 <p className="mr-2 text-base font-semibold text-white">{formatINR(order.order_value)}</p>
-                <button onClick={() => startEdit(order)} className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="Edit order">
-                  <Icon name="edit" className="w-4 h-4" />
-                </button>
+                {!isStaff() && (
+                  <button onClick={() => startEdit(order)} className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="Edit order">
+                    <Icon name="edit" className="w-4 h-4" />
+                  </button>
+                )}
                 {isOwner() && (
                   <button onClick={() => handleDelete(order)} className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300" aria-label="Delete order">
                     <Icon name="trash" className="w-4 h-4" />

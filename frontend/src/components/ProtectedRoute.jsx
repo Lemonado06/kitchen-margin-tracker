@@ -1,10 +1,12 @@
 import { Navigate } from 'react-router-dom';
-import { getUser } from '../api/client';
+import { getUser, homePath } from '../api/client';
 
-// Only render the page when a login token exists (and, if given, the user has the required role)
-export default function ProtectedRoute({ role, children }) {
+// Only render the page when a login token exists and, if roles are given, the user has one of them.
+// `role="owner"` and `roles={['owner', 'manager']}` both work.
+export default function ProtectedRoute({ role, roles, children }) {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
-  if (role && getUser().role !== role) return <Navigate to="/dashboard" replace />;
+  const allowed = roles || (role ? [role] : null);
+  if (allowed && !allowed.includes(getUser().role)) return <Navigate to={homePath()} replace />;
   return children;
 }

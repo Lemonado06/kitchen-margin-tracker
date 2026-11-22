@@ -11,18 +11,24 @@ const suggestions = [
   'Are discounts hurting my profit?',
   'What if I raise Paneer Tikka by 15%?',
   'How did profit move week by week?',
+  'Compare my outlets',
+  'Any unusual days lately?',
+  'Forecast profit for the next 2 weeks',
 ];
 
 // Friendly names for the data tools the assistant can call
 const toolLabels = {
   get_kpis: 'KPIs', cost_breakdown: 'Cost breakdown', margin_by_dish: 'Margin by dish', margin_by_platform: 'Margin by platform',
   discount_impact: 'Discount impact', profit_trend: 'Profit trend', menu_costing: 'Menu costing', fee_rules: 'Fee rules',
-  recent_orders: 'Recent orders', price_simulation: 'Price what-if',
+  recent_orders: 'Recent orders', price_simulation: 'Price what-if', app_stats: 'App & account facts', break_even_discount: 'Break-even discount',
+  loss_analysis: 'Loss analysis', day_of_week_performance: 'Day of week', menu_engineering: 'Menu engineering', period_comparison: 'Period comparison',
+  cost_shock_simulation: 'Ingredient cost what-if', platform_shift_simulation: 'Platform shift what-if', outlet_comparison: 'Outlet comparison',
+  anomaly_detection: 'Anomaly detection', profit_forecast: 'Forecast (experiment)',
 };
 
-const welcome = { role: 'assistant', text: 'Ask me anything about this outlet\'s dishes, platforms, costs or margins. I read your live order data and follow the dashboard filters.' };
+const welcome = { role: 'assistant', text: 'Ask me anything about the selected outlets\' dishes, platforms, costs or margins. I read your live order data and follow the dashboard filters. I can also compare outlets, flag unusual days and run what-if scenarios.' };
 
-export default function AIChat({ outletId, filters }) {
+export default function AIChat({ outletIds, filters }) {
   const [messages, setMessages] = useState([welcome]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,7 +54,7 @@ export default function AIChat({ outletId, filters }) {
     setError('');
 
     try {
-      const res = await api.post('/ai/chat', { message: userMessage, outlet_id: outletId, filters: filters || {}, history });
+      const res = await api.post('/ai/chat', { message: userMessage, outlet_ids: outletIds, filters: filters || {}, history });
       setMessages((prev) => [...prev, { role: 'assistant', text: res.data.reply, tools: res.data.tools_used, model: res.data.model }]);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to get a response');
@@ -78,7 +84,7 @@ export default function AIChat({ outletId, filters }) {
           <div>
             <h2 className="font-semibold text-white">Ask the assistant</h2>
             <p className="text-sm text-slate-400">
-              Live order data · {activeFilters ? `${activeFilters} filter${activeFilters > 1 ? 's' : ''} applied` : 'all orders'}
+              Live order data · {outletIds.length > 1 ? `${outletIds.length} outlets` : '1 outlet'} · {activeFilters ? `${activeFilters} filter${activeFilters > 1 ? 's' : ''} applied` : 'all orders'}
             </p>
           </div>
         </div>
@@ -92,11 +98,10 @@ export default function AIChat({ outletId, filters }) {
           <div key={i} className={`flex animate-fade-up ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className="max-w-[85%]">
               <div
-                className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                  m.role === 'user'
+                className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === 'user'
                     ? 'rounded-br-md bg-gradient-to-r from-emerald-500 to-cyan-500 font-medium text-slate-950 shadow-lg shadow-emerald-500/20'
                     : 'rounded-bl-md border border-white/10 bg-white/[0.06] text-slate-100'
-                }`}
+                  }`}
               >
                 {m.role === 'user' ? m.text : <Markdown text={m.text} />}
               </div>

@@ -12,6 +12,10 @@ import Profile from './pages/Profile';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { FeedbackProvider } from './components/Feedback';
+import { homePath } from './api/client';
+
+// Owners and managers see profit and costs; kitchen staff only reach outlets, orders and their profile
+const PROFIT_ROLES = ['owner', 'manager'];
 
 function App() {
   return (
@@ -21,16 +25,16 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard" element={<ProtectedRoute roles={PROFIT_ROLES}><Dashboard /></ProtectedRoute>} />
             <Route path="/outlets" element={<Outlets />} />
-            <Route path="/outlets/:outletId/dishes" element={<Dishes />} />
+            <Route path="/outlets/:outletId/dishes" element={<ProtectedRoute roles={PROFIT_ROLES}><Dishes /></ProtectedRoute>} />
             <Route path="/outlets/:outletId/orders" element={<Orders />} />
-            <Route path="/outlets/:outletId/fee-rules" element={<FeeRules />} />
+            <Route path="/outlets/:outletId/fee-rules" element={<ProtectedRoute roles={PROFIT_ROLES}><FeeRules /></ProtectedRoute>} />
             <Route path="/team" element={<ProtectedRoute role="owner"><Team /></ProtectedRoute>} />
             <Route path="/profile" element={<Profile />} />
           </Route>
           <Route path="/" element={<Landing />} />
-          <Route path="*" element={<Navigate to="/dashboard" />} />
+          <Route path="*" element={<Navigate to={homePath()} />} />
         </Routes>
       </BrowserRouter>
     </FeedbackProvider>

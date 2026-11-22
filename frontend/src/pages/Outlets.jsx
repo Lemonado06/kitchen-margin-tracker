@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import api, { isOwner } from '../api/client';
+import api, { isOwner, isStaff } from '../api/client';
 import Icon from '../components/Icon';
 import { useConfirm, useLoad, useToast } from '../hooks';
 import { Button, Card, EditingBanner, EmptyState, ErrorText, Input, PageHeader, Skeleton } from '../components/ui';
@@ -20,6 +20,8 @@ export default function Outlets() {
   const [error, setError] = useState('');
   const toast = useToast();
   const confirm = useConfirm();
+  const staff = isStaff(); // kitchen staff only record orders
+  const visibleLinks = staff ? links.filter((l) => l.to === 'orders') : links;
 
   function resetForm() {
     setName('');
@@ -78,10 +80,10 @@ export default function Outlets() {
 
   return (
     <>
-      <PageHeader title="Outlets" subtitle="Each outlet has its own menu, orders and platform fees." />
+      <PageHeader title="Outlets" subtitle={staff ? 'Pick an outlet to record its orders.' : 'Each outlet has its own menu, orders and platform fees.'} />
 
       <EditingBanner show={!!editingId} />
-      <Card as="form" onSubmit={handleSubmit}
+      {!staff && <Card as="form" onSubmit={handleSubmit}
         className={`mb-8 flex flex-col gap-3 p-4 sm:flex-row ${editingId ? 'ring-2 ring-amber-400/60' : ''}`}>
         <Input type="text" placeholder="Outlet name" value={name} onChange={(e) => setName(e.target.value)} required />
         <Input type="text" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
@@ -91,7 +93,7 @@ export default function Outlets() {
           </Button>
           {editingId && <Button type="button" variant="ghost" onClick={resetForm}>Cancel</Button>}
         </div>
-      </Card>
+      </Card>}
 
       <ErrorText>{error || loadError}</ErrorText>
 
@@ -116,9 +118,11 @@ export default function Outlets() {
                   </div>
                 </div>
                 <div className="flex gap-1 opacity-70 transition group-hover:opacity-100">
-                  <button onClick={() => startEdit(outlet)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="Edit outlet">
-                    <Icon name="edit" className="w-4 h-4" />
-                  </button>
+                  {!staff && (
+                    <button onClick={() => startEdit(outlet)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="Edit outlet">
+                      <Icon name="edit" className="w-4 h-4" />
+                    </button>
+                  )}
                   {isOwner() && (
                     <button onClick={() => handleDelete(outlet)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300" aria-label="Delete outlet">
                       <Icon name="trash" className="w-4 h-4" />
@@ -126,8 +130,8 @@ export default function Outlets() {
                   )}
                 </div>
               </div>
-              <div className="mt-auto grid grid-cols-3 gap-2">
-                {links.map((l) => (
+              <div className={`mt-auto grid gap-2 ${staff ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                {visibleLinks.map((l) => (
                   <Link key={l.to} to={`/outlets/${outlet.id}/${l.to}`}
                     className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-medium text-slate-300 transition hover:-translate-y-0.5 hover:border-emerald-400/40 hover:bg-emerald-400/10 hover:text-emerald-200">
                     <Icon name={l.icon} className="w-4 h-4" />

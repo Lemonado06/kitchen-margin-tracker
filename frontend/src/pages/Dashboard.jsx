@@ -4,6 +4,7 @@ import { BarChart, Bar, Cell, AreaChart, Area, PieChart, Pie, XAxis, YAxis, Cart
 import api, { getUser } from '../api/client';
 import AIChat from '../components/AIChat';
 import AIInsights from '../components/AIInsights';
+import OutletPicker from '../components/OutletPicker';
 import { formatINR } from '../hooks';
 import Icon from '../components/Icon';
 import { AnimatedNumber, Badge, Button, Card, EmptyState, ErrorText, Field, Input, PageHeader, Select, Skeleton } from '../components/ui';
@@ -36,7 +37,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [outlets, setOutlets] = useState(null);
   const [platforms, setPlatforms] = useState([]);
-  const [outletId, setOutletId] = useState('');
+  const [outletIds, setOutletIds] = useState([]); // one or several outlets, analysed together
   const [platformId, setPlatformId] = useState('');
   const [dishes, setDishes] = useState([]);
   const [dishId, setDishId] = useState('');
@@ -51,7 +52,7 @@ export default function Dashboard() {
         const [outletsRes, platformsRes] = await Promise.all([api.get('/outlets'), api.get('/platforms')]);
         setOutlets(outletsRes.data);
         setPlatforms(platformsRes.data);
-        if (outletsRes.data.length > 0) setOutletId(outletsRes.data[0].id);
+        setOutletIds(outletsRes.data.slice(0, 10).map((o) => o.id)); // start with all outlets (up to 10)
       } catch {
         setError('Failed to load filters');
       }
@@ -59,30 +60,40 @@ export default function Dashboard() {
     loadFilters();
   }, []);
 
-  // Dish filter options follow the selected outlet
+  const outletKey = outletIds.join(',');
+  const multi = outletIds.length > 1;
+  const outletName = (id) => (outlets || []).find((o) => o.id === id)?.name || '';
+
+  // Dish filter options follow the selected outlets (names carry their outlet when several are selected)
   useEffect(() => {
-    if (!outletId) return;
-    api.get(`/dishes/outlet/${outletId}`).then((res) => setDishes(res.data)).catch(() => setDishes([]));
-  }, [outletId]);
+    if (!outlets || outletIds.length === 0) return;
+    let cancelled = false;
+    Promise.all(outletIds.map((id) => api.get(`/dishes/outlet/${id}`).then((res) =>
+      res.data.map((d) => ({ ...d, label: outletIds.length > 1 ? `${d.name} (${outletName(id)})` : d.name })))))
+      .then((lists) => { if (!cancelled) setDishes(lists.flat()); })
+      .catch(() => { if (!cancelled) setDishes([]); });
+    return () => { cancelled = true; };
+  }, [outletKey, outlets]);
 
   useEffect(() => {
-    if (!outletId) return;
+    if (outletIds.length === 0) return;
+    let cancelled = false;
     async function loadMargins() {
       try {
-        const params = { outlet_id: outletId };
+        const params = { outlet_ids: outletKey };
         if (platformId) params.platform_id = platformId;
         if (dishId) params.dish_id = dishId;
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
         const res = await api.get('/dashboard/margins', { params });
-        setData(res.data);
-        setError('');
+        if (!cancelled) { setData(res.data); setError(''); }
       } catch (err) {
-        setError(err.response?.data?.error || 'Failed to load dashboard data');
+        if (!cancelled) setError(err.response?.data?.error || 'Failed to load dashboard data');
       }
     }
     loadMargins();
-  }, [outletId, platformId, dishId, dateFrom, dateTo]);
+    return () => { cancelled = true; };
+  }, [outletKey, platformId, dishId, dateFrom, dateTo]);
 
   const hasFilters = platformId || dishId || dateFrom || dateTo;
   const filters = {
@@ -118,11 +129,10 @@ export default function Dashboard() {
 
       {/* Filters */}
       <Card className="relative z-10 mb-6 grid grid-cols-2 gap-4 p-5 md:grid-cols-3 xl:grid-cols-5">
-        <Field label="Outlet">
-          <Select value={outletId} onChange={(e) => { setOutletId(e.target.value); setDishId(''); }}>
-            {(outlets || []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </Select>
-        </Field>
+        <div>
+          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">Outlets</span>
+          <OutletPicker outlets={outlets || []} selected={outletIds} onChange={(ids) => { setOutletIds(ids); setDishId(''); }} />
+        </div>
         <Field label="Platform">
           <Select value={platformId} onChange={(e) => setPlatformId(e.target.value)}>
             <option value="">All platforms</option>
@@ -132,7 +142,7 @@ export default function Dashboard() {
         <Field label="Dish">
           <Select value={dishId} onChange={(e) => setDishId(e.target.value)}>
             <option value="">All dishes</option>
-            {dishes.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            {dishes.map((d) => <option key={d.id} value={d.id}>{d.label || d.name}</option>)}
           </Select>
         </Field>
         <Field label="From">
@@ -172,18 +182,45 @@ export default function Dashboard() {
               tone={{ glow: 'bg-amber-500', icon: 'bg-amber-400/10 text-amber-300', text: 'text-white' }} />
           </div>
 
-          <AIInsights outletId={outletId} filters={filters} />
+          <AIInsights outletIds={outletIds} filters={filters} />
+
+          {/* Outlet comparison, shown when several outlets are selected */}
+          {multi && (
+            <Card delay={190} className="mb-6 p-5">
+              <h2 className="font-semibold text-white">Profit by outlet</h2>
+              <p className="mb-4 text-sm text-slate-400">Revenue vs what each outlet keeps, most profit first</p>
+              <ResponsiveContainer width="100%" height={Math.max(180, (data.outletBreakdown || []).length * 56)}>
+                <BarChart data={data.outletBreakdown || []} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" horizontal={false} />
+                  <XAxis type="number" tickFormatter={formatINR} {...axisProps} />
+                  <YAxis type="category" dataKey="outlet_name" width={170} interval={0} {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
+                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
+                  <Bar dataKey="revenue" name="Revenue" fill="#818cf8" fillOpacity={0.55} radius={[0, 6, 6, 0]} animationDuration={900} />
+                  <Bar dataKey="profit" name="Profit" fill="url(#profitBar)" radius={[0, 6, 6, 0]} animationDuration={900} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(data.outletBreakdown || []).map((o) => (
+                  <Badge key={o.outlet_id} tone={o.marginPct < 10 ? 'red' : o.marginPct < 30 ? 'amber' : 'green'}>
+                    {o.outlet_name}: {o.marginPct.toFixed(1)}% margin
+                  </Badge>
+                ))}
+              </div>
+            </Card>
+          )}
+
 
           {/* Charts */}
           <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card delay={200} className="p-5">
               <h2 className="mb-4 font-semibold text-white">Profit by dish</h2>
               {/* Horizontal bars so full dish names fit on the axis */}
-              <ResponsiveContainer width="100%" height={Math.max(250, data.dishBreakdown.length * 44)}>
+              <ResponsiveContainer width="100%" height={Math.max(250, data.dishBreakdown.length * (multi ? 34 : 44))}>
                 <BarChart data={data.dishBreakdown} layout="vertical" margin={{ left: 10, right: 20 }}>
                   <CartesianGrid stroke="rgb(255 255 255 / 0.06)" horizontal={false} />
                   <XAxis type="number" tickFormatter={formatINR} {...axisProps} />
-                  <YAxis type="category" dataKey="dish_name" width={130} interval={0} {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
+                  <YAxis type="category" dataKey="dish_name" width={multi ? 220 : 130} interval={0} {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
                   <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
                   <Bar dataKey="profit" name="Profit" radius={[0, 8, 8, 0]} animationDuration={900}>
                     {data.dishBreakdown.map((d) => (
@@ -278,7 +315,7 @@ export default function Dashboard() {
 
           {/* AI Assistant */}
           <div className="mb-6">
-            <AIChat outletId={outletId} filters={filters} />
+            <AIChat outletIds={outletIds} filters={filters} />
           </div>
 
           {/* Dish table, worst margin first */}

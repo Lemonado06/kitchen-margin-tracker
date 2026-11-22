@@ -1,99 +1,256 @@
+
 const express = require('express');
 const bcrypt = require('bcrypt');
 const router = express.Router();
+
 const { User } = require('./models');
 const { requireAuth, requireRole } = require('./middleware');
 const { validId } = require('./access');
 
 module.exports = () => {
-  // MY PROFILE
+
+  // Remove sensitive fields before sending user data to frontend.
+  function safeUser(user) {
+    const data = user.toJSON();
+    delete data.password_hash;
+    return data;
+  }
+
+  // GET MY PROFILE
+  // Accessible to owners, managers and staff.
   router.get('/me', requireAuth, async (req, res) => {
     try {
       const user = await User.findById(req.user.id);
-      const owner = user.role === 'manager' ? await User.findById(user.owner_id) : null;
-      res.json({ ...user.toJSON(), owner_name: owner?.name || null });
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      let owner = null;
+
+      if (user.owner_id) {
+        owner = await User.findById(user.owner_id).select('name');
+      }
+
+      res.json({
+        ...safeUser(user),
+        owner_name: owner?.name || null
+      });
+
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // UPDATE MY PROFILE (name, and password when current_password is given)
+
+  // UPDATE MY PROFILE
+  // All authenticated roles can update their own name and password.
   router.put('/me', requireAuth, async (req, res) => {
     const name = req.body.name?.trim();
     const { current_password, new_password } = req.body;
-    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    if (!name) {
+      return res.status(400).json({
+        error: 'Name is required'
+      });
+    }
+
     try {
       const user = await User.findById(req.user.id);
+
+      if (!user) {
+        return res.status(404).json({
+          error: 'User not found'
+        });
+      }
+
       if (new_password) {
-        if (new_password.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
-        if (!current_password || !(await bcrypt.compare(current_password, user.password_hash))) {
-          return res.status(400).json({ error: 'Current password is incorrect' });
+        if (new_password.length < 6) {
+          return res.status(400).json({
+            error: 'New password must be at least 6 characters'
+          });
         }
+
+        if (
+          !current_password ||
+          !(await bcrypt.compare(
+            current_password,
+            user.password_hash
+          ))
+        ) {
+          return res.status(400).json({
+            error: 'Current password is incorrect'
+          });
+        }
+
         user.password_hash = await bcrypt.hash(new_password, 10);
       }
+
       user.name = name;
+
       await user.save();
-      res.json(user);
+
+      res.json(safeUser(user));
+
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // LIST TEAM (owners only): the owner plus their managers
+
+  // LIST TEAM
+  // Owners can see themselves and all their managers/staff.
   router.get('/', requireAuth, requireRole('owner'), async (req, res) => {
     try {
-      const team = await User.find({ $or: [{ _id: req.user.id }, { owner_id: req.user.id }] }).sort({ role: -1, created_at: 1 });
-      res.json(team);
+      const team = await User.find({
+        $or: [
+          { _id: req.user.id },
+          { owner_id: req.user.id }
+        ]
+      }).sort({ role: -1, created_at: 1 });
+
+      res.json(team.map(safeUser));
+
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // ADD MANAGER (owners only)
+
+  // ADD TEAM MEMBER
+  // Owners can add managers or kitchen staff.
   router.post('/', requireAuth, requireRole('owner'), async (req, res) => {
     const name = req.body.name?.trim();
     const email = req.body.email?.toLowerCase().trim();
     const { password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ error: 'name, email and password are required' });
-    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const role = req.body.role || 'manager';
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        error: 'Name, email and password are required'
+      });
+    }
+
+    if (!['manager', 'staff'].includes(role)) {
+      return res.status(400).json({
+        error: 'Role must be manager or staff'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        error: 'Password must be at least 6 characters'
+      });
+    }
+
     try {
-      if (await User.findOne({ email })) return res.status(409).json({ error: 'Email already registered' });
+      const existingUser = await User.findOne({ email });
+
+      if (existingUser) {
+        return res.status(409).json({
+          error: 'Email already registered'
+        });
+      }
+
       const password_hash = await bcrypt.hash(password, 10);
-      const manager = await User.create({ name, email, password_hash, role: 'manager', owner_id: req.user.id });
-      res.status(201).json(manager);
+
+      const member = await User.create({
+        name,
+        email,
+        password_hash,
+        role,
+        owner_id: req.user.id
+      });
+
+      res.status(201).json(safeUser(member));
+
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // UPDATE MANAGER (owners only): rename, or reset their password
+
+  // UPDATE TEAM MEMBER
+  // Owners can rename, reset passwords and change roles.
   router.put('/:id', requireAuth, requireRole('owner'), async (req, res) => {
     const name = req.body.name?.trim();
-    const { password } = req.body;
-    if (!name) return res.status(400).json({ error: 'Name is required' });
-    if (password && password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const { password, role } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        error: 'Name is required'
+      });
+    }
+
+    if (password && password.length < 6) {
+      return res.status(400).json({
+        error: 'Password must be at least 6 characters'
+      });
+    }
+
+    if (role && !['manager', 'staff'].includes(role)) {
+      return res.status(400).json({
+        error: 'Role must be manager or staff'
+      });
+    }
+
     try {
-      const manager = validId(req.params.id) ? await User.findOne({ _id: req.params.id, owner_id: req.user.id }) : null;
-      if (!manager) return res.status(404).json({ error: 'Team member not found' });
-      manager.name = name;
-      if (password) manager.password_hash = await bcrypt.hash(password, 10);
-      await manager.save();
-      res.json(manager);
+      const member = validId(req.params.id)
+        ? await User.findOne({
+          _id: req.params.id,
+          owner_id: req.user.id
+        })
+        : null;
+
+      if (!member) {
+        return res.status(404).json({
+          error: 'Team member not found'
+        });
+      }
+
+      member.name = name;
+
+      if (password) {
+        member.password_hash = await bcrypt.hash(password, 10);
+      }
+
+      if (role) {
+        member.role = role;
+      }
+
+      await member.save();
+
+      res.json(safeUser(member));
+
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // REMOVE MANAGER (owners only)
+
+  // REMOVE TEAM MEMBER
   router.delete('/:id', requireAuth, requireRole('owner'), async (req, res) => {
     try {
-      const manager = validId(req.params.id) ? await User.findOneAndDelete({ _id: req.params.id, owner_id: req.user.id }) : null;
-      if (!manager) return res.status(404).json({ error: 'Team member not found' });
+      const member = validId(req.params.id)
+        ? await User.findOneAndDelete({
+          _id: req.params.id,
+          owner_id: req.user.id
+        })
+        : null;
+
+      if (!member) {
+        return res.status(404).json({
+          error: 'Team member not found'
+        });
+      }
+
       res.json({ deleted: true });
+
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
+
 
   return router;
 };

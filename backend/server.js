@@ -10,6 +10,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Kitchen staff are limited to viewing data and adding orders, whatever route they call
+app.use(require('./staffGuard'));
+
 app.use('/auth', require('./auth')());
 app.use('/users', require('./users')());
 app.use('/outlets', require('./outlets')());

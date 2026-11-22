@@ -42,16 +42,62 @@ const toolDeclarations = [
     parameters: { type: 'object', properties: { limit: { type: 'integer', description: 'How many orders, 1-25, default 10' } } },
   },
   {
-    name: 'price_simulation', description: 'What-if analysis: profit on a dish\'s past orders if its price were different. Give new_price or change_pct.',
+    name: 'price_simulation', description: 'What-if analysis: profit on a dish\'s past orders if its price were different. Give new_price or change_pct. Optionally give volume_change_pct to model fewer or more orders. When a rise would help, it also returns how far orders can fall before the rise stops paying off.',
     parameters: {
       type: 'object',
       properties: {
         dish_name: { type: 'string', description: 'Dish name as on the menu' },
         new_price: { type: 'number', description: 'New menu price in rupees' },
         change_pct: { type: 'number', description: 'Price change in percent, e.g. 10 or -5' },
+        volume_change_pct: { type: 'number', description: 'Assumed change in number of orders in percent, e.g. -10 for 10% fewer orders. Omit to keep volume the same.' },
       },
       required: ['dish_name'],
     },
+  },
+  { name: 'app_stats', description: 'Facts about the app itself (name, purpose, profit formula, owner and manager roles) and counts for this account: outlets, managers, dishes, orders, fee rules, platforms and the first and last order dates. Counts cover only the signed-in owner\'s account. Ignores order filters.', parameters: noArgs },
+  {
+    name: 'break_even_discount', description: 'For each dish on each platform: the most discount an order can carry before it loses money, the average discount actually given, and the headroom between them. Smallest headroom first.',
+    parameters: { type: 'object', properties: { dish_name: { type: 'string', description: 'Optional: limit to one dish' } } },
+  },
+  { name: 'loss_analysis', description: 'Why orders lose money: how many orders are loss-making, the total loss, and the worst dish and platform combinations with their average discount, food cost, platform fees and which cost is the largest.', parameters: noArgs },
+  { name: 'day_of_week_performance', description: 'Orders, revenue, profit, margin % and average profit per order for each day of the week. Shows whether weekends are more profitable or just busier.', parameters: noArgs },
+  { name: 'menu_engineering', description: 'Sorts every dish into Star (popular and profitable), Plowhorse (popular but thin), Puzzle (profitable but rarely ordered) or Dog (neither), with a suggested action for each.', parameters: noArgs },
+  {
+    name: 'period_comparison', description: 'Compares the latest N days with the N days before them: orders, revenue, profit, margin and the % change. Uses the platform and dish filters but sets its own date ranges.',
+    parameters: { type: 'object', properties: { days: { type: 'integer', description: 'Length of each period in days, 1-180, default 30' } } },
+  },
+  {
+    name: 'cost_shock_simulation', description: 'What-if analysis: effect on profit if an ingredient\'s cost goes up or down, for every dish that uses it. Prices and order volumes are held the same.',
+    parameters: {
+      type: 'object',
+      properties: {
+        ingredient_name: { type: 'string', description: 'Ingredient name or part of it, e.g. Chicken' },
+        change_pct: { type: 'number', description: 'Cost change in percent, e.g. 10 or -5' },
+      },
+      required: ['ingredient_name', 'change_pct'],
+    },
+  },
+  {
+    name: 'platform_shift_simulation', description: 'What-if analysis: profit change if some orders moved from one platform to another (e.g. Swiggy to Direct). Only platform fees change; it does not predict whether customers would switch.',
+    parameters: {
+      type: 'object',
+      properties: {
+        from_platform: { type: 'string', description: 'Platform the orders move from, e.g. Swiggy' },
+        to_platform: { type: 'string', description: 'Platform the orders move to, e.g. Direct' },
+        dish_name: { type: 'string', description: 'Optional: limit to one dish' },
+        share_pct: { type: 'number', description: 'Percent of those orders that move, 0-100, default 100' },
+      },
+      required: ['from_platform', 'to_platform'],
+    },
+  },
+  { name: 'outlet_comparison', description: 'Compares the selected outlets: orders, revenue, profit, margin %, discount share, loss-making share, each outlet\'s best and worst dish and platform, ranked by profit. Most useful when several outlets are selected.', parameters: noArgs },
+  {
+    name: 'anomaly_detection', description: 'Finds unusual days (order count, margin %) and unusual dish-weeks (weekly margin %) compared with the same weekday or the dish\'s own previous weeks. Needs at least 5 weeks of orders.',
+    parameters: { type: 'object', properties: { threshold: { type: 'number', description: 'Sensitivity in robust standard deviations, 2 to 6, default 3. Lower finds more.' } } },
+  },
+  {
+    name: 'profit_forecast', description: 'EXPERIMENT: projects daily profit forward from the weekday pattern and trend of the last 8 weeks, and backtests the same method on the last 4 weeks. Needs at least 4 weeks of orders.',
+    parameters: { type: 'object', properties: { days: { type: 'integer', description: 'Days to project, 1-28, default 14' } } },
   },
 ];
 
@@ -75,6 +121,17 @@ const toolImpl = {
   fee_rules: (o) => tools.feeRules(o),
   recent_orders: (o, f, a) => tools.recentOrders(o, f, a),
   price_simulation: (o, f, a) => tools.priceSimulation(o, f, a),
+  app_stats: (o) => tools.appStats(o),
+  break_even_discount: (o, f, a) => tools.breakEvenDiscount(o, f, a),
+  loss_analysis: (o, f) => tools.lossAnalysis(o, f),
+  day_of_week_performance: (o, f) => tools.dayOfWeekPerformance(o, f),
+  menu_engineering: (o, f) => tools.menuEngineering(o, f),
+  period_comparison: (o, f, a) => tools.periodComparison(o, f, a),
+  cost_shock_simulation: (o, f, a) => tools.costShockSimulation(o, f, a),
+  platform_shift_simulation: (o, f, a) => tools.platformShiftSimulation(o, f, a),
+  outlet_comparison: (o, f) => tools.outletComparison(o, f),
+  anomaly_detection: (o, f, a) => tools.anomalyDetection(o, f, a),
+  profit_forecast: (o, f, a) => tools.profitForecast(o, f, a),
 };
 
 const isBusy = (err) => /503|504|429|UNAVAILABLE|DEADLINE_EXCEEDED|RESOURCE_EXHAUSTED|overloaded|high demand|rate limit|timed? ?out|abort/i.test(`${err?.name} ${err?.message}`);
@@ -97,12 +154,21 @@ async function describeFilters(filters) {
   return parts.length ? parts.join(', ') : 'none (all orders)';
 }
 
-async function systemPrompt(outlet, filters, user) {
+const outletLabel = (o) => `"${o.name}"${o.city ? ` (${o.city})` : ''}`;
+
+async function systemPrompt(outlets, filters, user) {
+  const multi = outlets.length > 1;
   return [
-    `You are the margin analyst inside Kitchen Margin Tracker, helping ${user.name} (${user.role}) run the cloud kitchen outlet "${outlet.name}"${outlet.city ? ` in ${outlet.city}` : ''}.`,
+    multi
+      ? `You are the margin analyst inside Kitchen Margin Tracker, helping ${user.name} (${user.role}) analyse ${outlets.length} cloud kitchen outlets together: ${outlets.map(outletLabel).join(', ')}.`
+      : `You are the margin analyst inside Kitchen Margin Tracker, helping ${user.name} (${user.role}) run the cloud kitchen outlet ${outletLabel(outlets[0])}.`,
+    ...(multi ? ['Several outlets are selected: every tool combines them. Dish names in tool results carry their outlet in brackets because the same dish can exist at more than one outlet; keep that when you quote them. Fee rules and recipes differ per outlet. To compare outlets, call outlet_comparison. Only these outlets are in scope; if asked about any other outlet, say it is not selected.'] : []),
     `Today is ${new Date().toISOString().slice(0, 10)}. Currency is Indian rupees; write amounts like ₹1,250.`,
-    `Active dashboard filters: ${await describeFilters(filters)}. Every tool except menu_costing and fee_rules already applies these filters; mention them when they narrow the answer.`,
+    `Active dashboard filters: ${await describeFilters(filters)}. Every tool except menu_costing, fee_rules and app_stats already applies these filters (period_comparison applies only the platform and dish filters, because it sets its own date ranges); mention them when they narrow the answer.`,
+    'About the app: Kitchen Margin Tracker is a profit tracker for cloud kitchens selling on Zomato, Swiggy and direct orders. It works out the real profit on every order and shows it on a dashboard with this assistant. There are three roles: an owner (full access, manages outlets, platforms and the team), a manager (can view, add and edit data, but cannot delete or manage platforms and the team) and kitchen staff (can only add and view orders, with no access to profit data or this assistant). For questions about the app itself or about how many outlets, managers, dishes or orders this account has, call app_stats. Report counts only for the signed-in owner\'s account; never state how many accounts, customers or users the whole app has, and never reveal other users\' names, emails or details.',
     'Profit per order = order value − platform commission − GST on that commission − discount − packaging − food cost (sum of the dish\'s recipe items).',
+    'price_simulation, cost_shock_simulation and platform_shift_simulation are what-if scenarios on past orders, not forecasts. State the assumption the tool returns, and say that real customer response is not modelled. For menu questions, menu_engineering classifies dishes; for losses, use loss_analysis and break_even_discount.',
+    'profit_forecast is an EXPERIMENT: a statistical projection of the past weekday and trend pattern. Always quote the backtest error it returns (or say it had too little history to be tested), say whether it beat the naive baseline, and call the result an estimate, never a promise. anomaly_detection flags unusual days or dish-weeks; present them as leads to investigate, not proven causes, and offer loss_analysis or discount_impact to look for the cause.',
     'Always call tools to get numbers. Never invent or estimate figures the tools did not return. Call several tools when a question needs them, and call them again for each new question instead of reusing numbers from earlier answers.',
     'Answer in 2-6 short sentences or a short bulleted list. Lead with the answer, quote the key numbers, and end with one concrete, practical suggestion when it fits.',
     'If there is no data for the filters, say so and suggest widening them. Politely decline questions unrelated to the kitchen\'s business.',
@@ -110,10 +176,10 @@ async function systemPrompt(outlet, filters, user) {
 }
 
 // Runs one tool call from the model and returns its result (errors become { error })
-async function runTool(name, args, outletId, filters) {
+async function runTool(name, args, outletIds, filters) {
   const impl = toolImpl[name];
   try {
-    return impl ? await impl(outletId, filters, args || {}) : { error: `Unknown tool ${name}` };
+    return impl ? await impl(outletIds, filters, args || {}) : { error: `Unknown tool ${name}` };
   } catch (err) {
     return { error: err.message };
   }
@@ -137,7 +203,7 @@ async function groqRequest(body) {
 }
 
 // One full question → answer exchange with tool calls, on one Groq model
-async function runGroqChat(model, { system, history, message, outletId, filters }) {
+async function runGroqChat(model, { system, history, message, outletIds, filters }) {
   const messages = [
     { role: 'system', content: system },
     ...history.map((h) => ({ role: h.role, content: h.text })),
@@ -153,7 +219,7 @@ async function runGroqChat(model, { system, history, message, outletId, filters 
       used.push(call.function.name);
       let args = {};
       try { args = JSON.parse(call.function.arguments || '{}'); } catch { /* run with the defaults */ }
-      const result = await runTool(call.function.name, args, outletId, filters);
+      const result = await runTool(call.function.name, args, outletIds, filters);
       return { role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) };
     }));
     messages.push(...results);
@@ -162,7 +228,7 @@ async function runGroqChat(model, { system, history, message, outletId, filters 
 }
 
 // One full question → answer exchange with tool calls, on one Gemini model
-async function runGeminiChat(model, { system, history, message, outletId, filters }) {
+async function runGeminiChat(model, { system, history, message, outletIds, filters }) {
   // Gemini calls the assistant "model", and its history must start with a user turn
   const past = history.map((h) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text }] }));
   while (past.length && past[0].role !== 'user') past.shift();
@@ -172,7 +238,7 @@ async function runGeminiChat(model, { system, history, message, outletId, filter
   for (let round = 0; round < 6 && response.functionCalls?.length; round++) {
     const parts = await Promise.all(response.functionCalls.map(async (call) => {
       used.push(call.name);
-      const result = await runTool(call.name, call.args, outletId, filters);
+      const result = await runTool(call.name, call.args, outletIds, filters);
       return { functionResponse: { name: call.name, response: { result } } };
     }));
     response = await chat.sendMessage({ message: parts });
@@ -265,14 +331,35 @@ async function generateInsights({ provider, model }, prompt) {
   return { insights };
 }
 
+const MAX_OUTLETS = 10;
+
+// The outlets a request covers: outlet_ids (a list) or the older single outlet_id.
+// Every one must belong to the caller's account. Returns { outlets } or { status, error }.
+async function resolveOutlets(req) {
+  if (req.user.role === 'staff') return { status: 403, error: 'Your role does not have access to the AI assistant' };
+  const { outlet_id, outlet_ids } = req.body;
+  const raw = Array.isArray(outlet_ids) && outlet_ids.length ? outlet_ids : [outlet_id];
+  const wanted = [...new Set(raw.filter(Boolean).map(String))];
+  if (!wanted.length) return { status: 400, error: 'outlet_ids (or outlet_id) required' };
+  if (wanted.length > MAX_OUTLETS) return { status: 400, error: `Select at most ${MAX_OUTLETS} outlets` };
+  const outlets = [];
+  for (const id of wanted) {
+    const outlet = await outletFor(id, req.user);
+    if (!outlet) return { status: 403, error: 'You do not own this outlet' };
+    outlets.push(outlet);
+  }
+  return { outlets };
+}
+
 module.exports = () => {
-  // CHAT: multi-turn question answering grounded in the outlet's data
+  // CHAT: multi-turn question answering grounded in the selected outlets' data
   router.post('/chat', requireAuth, async (req, res) => {
-    const { message, outlet_id, history } = req.body;
-    if (!message || !outlet_id) return res.status(400).json({ error: 'message and outlet_id required' });
+    const { message, history } = req.body;
+    if (!message) return res.status(400).json({ error: 'message required' });
     try {
-      const outlet = await outletFor(outlet_id, req.user);
-      if (!outlet) return res.status(403).json({ error: 'You do not own this outlet' });
+      const scope = await resolveOutlets(req);
+      if (scope.error) return res.status(scope.status).json({ error: scope.error });
+      const { outlets } = scope;
       const filters = cleanFilters(req.body.filters);
 
       // Last 10 turns of the conversation
@@ -281,8 +368,8 @@ module.exports = () => {
         .slice(-10)
         .map((h) => ({ role: h.role, text: h.text.slice(0, 4000) }));
 
-      const system = await systemPrompt(outlet, filters, req.user);
-      const result = await withFallback((m) => runChat(m, { system, history: past, message: String(message).slice(0, 2000), outletId: outlet._id, filters }));
+      const system = await systemPrompt(outlets, filters, req.user);
+      const result = await withFallback((m) => runChat(m, { system, history: past, message: String(message).slice(0, 2000), outletIds: outlets.map((o) => o._id), filters }));
       res.json(result);
     } catch (err) {
       console.error('AI chat error:', err.message);
@@ -293,22 +380,23 @@ module.exports = () => {
 
   // INSIGHTS: 3-4 short highlight cards for the current dashboard filters
   router.post('/insights', requireAuth, async (req, res) => {
-    const { outlet_id } = req.body;
-    if (!outlet_id) return res.status(400).json({ error: 'outlet_id required' });
     try {
-      const outlet = await outletFor(outlet_id, req.user);
-      if (!outlet) return res.status(403).json({ error: 'You do not own this outlet' });
+      const scope = await resolveOutlets(req);
+      if (scope.error) return res.status(scope.status).json({ error: scope.error });
+      const { outlets } = scope;
+      const ids = outlets.map((o) => o._id);
       const filters = cleanFilters(req.body.filters);
       const [kpis, byDish, byPlatform, costs, menu] = await Promise.all([
-        tools.getKpis(outlet._id, filters), tools.marginByDish(outlet._id, filters), tools.marginByPlatform(outlet._id, filters),
-        tools.costBreakdown(outlet._id, filters), tools.menuCosting(outlet._id),
+        tools.getKpis(ids, filters), tools.marginByDish(ids, filters), tools.marginByPlatform(ids, filters),
+        tools.costBreakdown(ids, filters), tools.menuCosting(ids),
       ]);
       if (kpis.orders === 0) {
         return res.json({ insights: computedInsights(kpis, byDish, byPlatform, costs), source: 'computed' });
       }
 
       const data = JSON.stringify({ filters: await describeFilters(filters), kpis, byDish, byPlatform, costs, menu });
-      const prompt = `Here is the profit data for the cloud kitchen outlet "${outlet.name}" (amounts in Indian rupees):\n${data}\n\nWrite 3 or 4 insights a kitchen owner can act on. Each: a short title (max 8 words) and a detail of one or two sentences quoting the numbers. Write money with the ₹ sign (₹1,250), never the word rupees. Use only these numbers, and only make comparisons they support (check which cost is largest before saying so). Type is "warning" for problems, "positive" for things going well, "tip" for suggestions.`;
+      const names = outlets.map((o) => `"${o.name}"`).join(', ');
+      const prompt = `Here is the profit data for the cloud kitchen ${outlets.length > 1 ? `outlets ${names}, combined` : `outlet ${names}`} (amounts in Indian rupees):\n${data}\n\nWrite 3 or 4 insights a kitchen owner can act on. Each: a short title (max 8 words) and a detail of one or two sentences quoting the numbers. Write money with the ₹ sign (₹1,250), never the word rupees. Use only these numbers, and only make comparisons they support (check which cost is largest before saying so). Type is "warning" for problems, "positive" for things going well, "tip" for suggestions.`;
       try {
         const result = await withFallback((m) => generateInsights(m, prompt));
         res.json({ ...result, source: 'ai' });
