@@ -1,13 +1,29 @@
-// Shared glassmorphism UI pieces used by every page
+
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 
-export function Card({ className = '', hover = false, delay = 0, children, as: Tag = 'div', ...props }) {
+// Shared design tokens are defined in index.css.
+// Components here intentionally use solid surfaces, subtle borders and restrained green accents.
+
+export function Card({
+  className = '',
+  hover = false,
+  delay = 0,
+  children,
+  as: Tag = 'div',
+  ...props
+}) {
   return (
     <Tag
       style={delay ? { animationDelay: `${delay}ms` } : undefined}
-      className={`glass rounded-2xl animate-fade-up ${hover ? 'transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-emerald-500/10 hover:shadow-2xl' : ''} ${className}`}
+      className={[
+        'rounded-xl border border-[#2A2F2B] bg-[#151816] animate-fade-up',
+        hover
+          ? 'transition-colors duration-150 hover:border-[#3DD68C]/40 hover:bg-[#1A1C1B]'
+          : '',
+        className,
+      ].join(' ')}
       {...props}
     >
       {children}
@@ -16,58 +32,122 @@ export function Card({ className = '', hover = false, delay = 0, children, as: T
 }
 
 const buttonStyles = {
-  primary: 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-400/40 hover:brightness-110',
-  ghost: 'bg-white/5 text-slate-200 border border-white/10 hover:bg-white/10 hover:border-white/20',
-  danger: 'bg-rose-500/10 text-rose-300 border border-rose-400/20 hover:bg-rose-500/20 hover:text-rose-200',
-  subtle: 'text-slate-300 hover:text-white hover:bg-white/10',
+  primary:
+    'border border-[#3DD68C] bg-[#3DD68C] text-[#07130D] hover:bg-[#55E3A0] hover:border-[#55E3A0]',
+  ghost:
+    'border border-[#2A2F2B] bg-[#1A1C1B] text-[#E5E9E6] hover:bg-[#222623] hover:border-[#414943]',
+  danger:
+    'border border-[#E5484D]/30 bg-[#E5484D]/10 text-[#FF777B] hover:bg-[#E5484D]/20 hover:border-[#E5484D]/50',
+  subtle:
+    'border border-transparent bg-transparent text-[#A3AAA5] hover:bg-[#1A1C1B] hover:text-[#F2F5F2]',
 };
 
-export function Button({ variant = 'primary', size = 'md', loading = false, icon, className = '', children, disabled, ...props }) {
-  const sizes = { sm: 'px-3 py-1.5 text-xs gap-1.5', md: 'px-4 py-2.5 text-sm gap-2', lg: 'px-5 py-3 text-base gap-2' };
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  icon,
+  className = '',
+  children,
+  disabled,
+  ...props
+}) {
+  const sizes = {
+    sm: 'min-h-8 px-3 py-1.5 text-xs gap-1.5 rounded-md',
+    md: 'min-h-10 px-4 py-2 text-sm gap-2 rounded-lg',
+    lg: 'min-h-12 px-5 py-3 text-base gap-2 rounded-lg',
+  };
+
   return (
     <button
       disabled={disabled || loading}
-      className={`relative inline-flex items-center justify-center rounded-xl font-semibold transition duration-200 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 ${sizes[size]} ${buttonStyles[variant]} ${className}`}
+      className={[
+        'inline-flex items-center justify-center font-semibold',
+        'transition-colors duration-150 active:scale-[0.98]',
+        'disabled:cursor-not-allowed disabled:opacity-45',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3DD68C]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0E0D]',
+        sizes[size] || sizes.md,
+        buttonStyles[variant] || buttonStyles.primary,
+        className,
+      ].join(' ')}
       {...props}
     >
-      {loading ? <Spinner className="w-4 h-4" /> : icon && <Icon name={icon} className={size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />}
+      {loading ? (
+        <Spinner className="h-4 w-4" />
+      ) : (
+        icon && (
+          <Icon
+            name={icon}
+            className={size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'}
+          />
+        )
+      )}
       {children}
     </button>
   );
 }
 
-const fieldClass = 'w-full rounded-xl border border-white/10 bg-slate-950/40 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 transition focus:border-emerald-400/60 focus:bg-slate-950/60 focus:outline-none focus:ring-4 focus:ring-emerald-400/10 disabled:opacity-60';
+const fieldClass = [
+  'w-full min-w-0 rounded-lg border border-[#343A35]',
+  'bg-[#0C0E0D] px-3.5 py-2.5 text-sm text-[#F2F5F2]',
+  'placeholder:text-[#69716B]',
+  'transition-colors duration-150',
+  'hover:border-[#465049]',
+  'focus:border-[#3DD68C] focus:outline-none focus:ring-2 focus:ring-[#3DD68C]/10',
+  'disabled:cursor-not-allowed disabled:opacity-50',
+].join(' ');
 
 export function Input({ className = '', ...props }) {
   return <input className={`${fieldClass} ${className}`} {...props} />;
 }
 
 export function Select({ className = '', children, ...props }) {
-  return <select className={`${fieldClass} cursor-pointer ${className}`} {...props}>{children}</select>;
+  return (
+    <select
+      className={`${fieldClass} cursor-pointer ${className}`}
+      {...props}
+    >
+      {children}
+    </select>
+  );
 }
 
 export function Field({ label, hint, className = '', children }) {
   return (
-    <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</span>
+    <label className={`block min-w-0 ${className}`}>
+      <span className="mb-2 block text-xs font-semibold tracking-wide text-[#A3AAA5]">
+        {label}
+      </span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
+      {hint && (
+        <span className="mt-1.5 block text-xs leading-relaxed text-[#747D76]">
+          {hint}
+        </span>
+      )}
     </label>
   );
 }
 
 export function PasswordInput(props) {
   const [show, setShow] = useState(false);
+
   return (
     <div className="relative">
-      <Input type={show ? 'text' : 'password'} className="pr-11" {...props} />
+      <Input
+        type={show ? 'text' : 'password'}
+        className="pr-11"
+        {...props}
+      />
       <button
         type="button"
-        onClick={() => setShow(!show)}
-        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 transition hover:text-slate-200"
+        onClick={() => setShow((current) => !current)}
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-[#747D76] transition-colors hover:text-[#E5E9E6] focus-visible:outline-none focus-visible:text-[#3DD68C]"
         aria-label={show ? 'Hide password' : 'Show password'}
       >
-        <Icon name={show ? 'eyeOff' : 'eye'} className="w-4 h-4" />
+        <Icon
+          name={show ? 'eyeOff' : 'eye'}
+          className="h-4 w-4"
+        />
       </button>
     </div>
   );
@@ -75,117 +155,226 @@ export function PasswordInput(props) {
 
 export function PageHeader({ title, subtitle, back, actions }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4 animate-fade-up">
-      <div>
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-4 animate-fade-up">
+      <div className="min-w-0">
         {back && (
-          <Link to={back.to} className="group mb-2 inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-emerald-300">
-            <Icon name="arrowLeft" className="w-4 h-4 transition group-hover:-translate-x-1" />
+          <Link
+            to={back.to}
+            className="group mb-3 inline-flex items-center gap-2 text-sm text-[#8D968F] transition-colors hover:text-[#3DD68C]"
+          >
+            <Icon
+              name="arrowLeft"
+              className="h-4 w-4 transition-transform group-hover:-translate-x-0.5"
+            />
             {back.label}
           </Link>
         )}
-        <h1 className="text-3xl font-bold tracking-tight text-white">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
+
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-[#F2F5F2] sm:text-3xl">
+          {title}
+        </h1>
+
+        {subtitle && (
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-[#8D968F]">
+            {subtitle}
+          </p>
+        )}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+
+      {actions && (
+        <div className="flex flex-wrap items-center gap-2">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
 
 export function Badge({ tone = 'slate', children }) {
   const tones = {
-    slate: 'bg-white/5 text-slate-300 ring-white/10',
-    green: 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/20',
-    amber: 'bg-amber-400/10 text-amber-300 ring-amber-400/20',
-    red: 'bg-rose-400/10 text-rose-300 ring-rose-400/20',
-    violet: 'bg-violet-400/10 text-violet-300 ring-violet-400/20',
-    cyan: 'bg-cyan-400/10 text-cyan-300 ring-cyan-400/20',
+    slate: 'bg-[#242925] text-[#B5BDB7] border-[#343B35]',
+    green: 'bg-[#3DD68C]/10 text-[#3DD68C] border-[#3DD68C]/25',
+    amber: 'bg-[#F2B134]/10 text-[#F2B134] border-[#F2B134]/25',
+    red: 'bg-[#E5484D]/10 text-[#FF777B] border-[#E5484D]/25',
+    violet: 'bg-[#A78BFA]/10 text-[#C4B5FD] border-[#A78BFA]/25',
+    cyan: 'bg-[#67C9D0]/10 text-[#83D9DF] border-[#67C9D0]/25',
   };
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${tones[tone]}`}>{children}</span>;
+
+  return (
+    <span
+      className={[
+        'inline-flex items-center rounded-md border px-2 py-1',
+        'text-[11px] font-semibold leading-none',
+        tones[tone] || tones.slate,
+      ].join(' ')}
+    >
+      {children}
+    </span>
+  );
 }
 
 export function RoleBadge({ role }) {
-  const roles = { owner: ['violet', 'Owner'], manager: ['cyan', 'Manager'], staff: ['amber', 'Staff'] };
-  const [tone, label] = roles[role] || ['slate', role];
+  const roles = {
+    owner: ['green', 'Owner'],
+    manager: ['cyan', 'Manager'],
+    staff: ['amber', 'Staff'],
+  };
+
+  const [tone, label] = roles[role] || ['slate', role || 'Unknown'];
+
   return <Badge tone={tone}>{label}</Badge>;
 }
 
-export function Spinner({ className = 'w-5 h-5' }) {
+export function Spinner({ className = 'h-5 w-5' }) {
   return (
-    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-      <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    <svg
+      className={`animate-spin ${className}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeOpacity="0.2"
+        strokeWidth="3"
+      />
+      <path
+        d="M22 12a10 10 0 0 0-10-10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
 export function Skeleton({ className = 'h-16' }) {
-  return <div className={`skeleton rounded-2xl ${className}`} />;
+  return (
+    <div
+      className={`skeleton rounded-lg border border-[#2A2F2B] bg-[#151816] ${className}`}
+    />
+  );
 }
 
 export function EmptyState({ icon = 'info', title, children }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 px-6 py-12 text-center animate-fade-in">
-      <div className="mb-3 rounded-2xl bg-white/5 p-3 text-slate-400"><Icon name={icon} className="w-6 h-6" /></div>
-      <p className="font-semibold text-slate-200">{title}</p>
-      {children && <p className="mt-1 max-w-sm text-sm text-slate-400">{children}</p>}
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#343B35] bg-[#151816]/50 px-6 py-12 text-center animate-fade-in">
+      <div className="mb-3 rounded-xl border border-[#2A2F2B] bg-[#1A1C1B] p-3 text-[#8D968F]">
+        <Icon name={icon} className="h-6 w-6" />
+      </div>
+
+      <p className="font-semibold text-[#E5E9E6]">{title}</p>
+
+      {children && (
+        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-[#8D968F]">
+          {children}
+        </p>
+      )}
     </div>
   );
 }
 
 export function ErrorText({ children }) {
   if (!children) return null;
+
   return (
-    <div className="mb-4 flex items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 animate-scale-in">
-      <Icon name="alert" className="w-4 h-4 shrink-0" />
-      {children}
+    <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#E5484D]/25 bg-[#E5484D]/10 px-4 py-3 text-sm leading-relaxed text-[#FF999C] animate-scale-in">
+      <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{children}</span>
     </div>
   );
 }
 
-// Highlight shown above a form while an existing record is being edited
+// Highlight shown above a form while an existing record is being edited.
 export function EditingBanner({ show }) {
   if (!show) return null;
+
   return (
-    <p className="mb-2 flex items-center gap-2 text-sm font-medium text-amber-300 animate-fade-in">
-      <Icon name="edit" className="w-4 h-4" /> Editing: change the fields below, then click Save.
+    <p className="mb-3 flex items-center gap-2 rounded-lg border border-[#F2B134]/20 bg-[#F2B134]/[0.07] px-3 py-2.5 text-sm font-medium text-[#F2B134] animate-fade-in">
+      <Icon name="edit" className="h-4 w-4 shrink-0" />
+      Editing: change the fields below, then click Save.
     </p>
   );
 }
 
-// Counts up from the previous value to the new one
+// Counts up from the previous value to the new one.
 export function AnimatedNumber({ value, format = (v) => v, duration = 700 }) {
   const [display, setDisplay] = useState(0);
   const from = useRef(0);
+
   useEffect(() => {
     const start = performance.now();
     const initial = from.current;
     let frame;
+
     const tick = (now) => {
       const t = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
+
       setDisplay(initial + (value - initial) * eased);
-      if (t < 1) frame = requestAnimationFrame(tick);
-      else from.current = value;
+
+      if (t < 1) {
+        frame = requestAnimationFrame(tick);
+      } else {
+        from.current = value;
+      }
     };
+
     frame = requestAnimationFrame(tick);
+
     return () => cancelAnimationFrame(frame);
   }, [value, duration]);
+
   return <>{format(display)}</>;
 }
 
 export function Modal({ open, onClose, title, children }) {
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => e.key === 'Escape' && onClose?.();
+
+    const onKey = (event) => {
+      if (event.key === 'Escape') onClose?.();
+    };
+
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
   if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="glass-strong relative w-full max-w-md rounded-2xl p-6 animate-scale-in">
-        <h2 className="mb-4 text-lg font-semibold text-white">{title}</h2>
+      <button
+        type="button"
+        aria-label="Close dialog"
+        className="absolute inset-0 cursor-default bg-black/75 animate-fade-in"
+        onClick={onClose}
+      />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-[#343A35] bg-[#151816] p-5 shadow-2xl shadow-black/40 animate-scale-in sm:p-6"
+      >
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <h2 className="font-display text-xl font-semibold text-[#F2F5F2]">
+            {title}
+          </h2>
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md p-1.5 text-[#8D968F] transition-colors hover:bg-[#242925] hover:text-white"
+          >
+            <Icon name="x" className="h-4 w-4" />
+          </button>
+        </div>
+
         {children}
       </div>
     </div>

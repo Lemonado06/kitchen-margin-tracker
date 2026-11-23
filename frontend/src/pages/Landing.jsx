@@ -1,68 +1,171 @@
+
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../components/Icon';
 import Reveal from '../components/Reveal';
-import { Backdrop } from '../components/Layout';
+import { homePath } from '../api/client';
+
+const GREEN = '#3DD68C';
 
 const features = [
-  { icon: 'trend', title: 'True profit per order', text: 'Every order is charged its platform commission, GST on that commission, discount, packaging and the dish\'s food cost.' },
-  { icon: 'dashboard', title: 'Analytics dashboard', text: 'Revenue, profit, margin and order KPIs, a profit trend, and dishes ranked by margin. Filter by outlet, platform, dish and date.' },
-  { icon: 'sparkles', title: 'AI margin assistant', text: 'Ask in plain English. The AI calls 10 data tools on your own orders and answers with real numbers, never guesses.' },
-  { icon: 'chef', title: 'Menu costing', text: 'Break each dish into ingredients and see its food cost and food-cost percentage against the menu price.' },
-  { icon: 'percent', title: 'Platform fee rules', text: 'Set Zomato, Swiggy, Direct or any other platform\'s commission and GST per outlet, and see each one\'s effective cut.' },
-  { icon: 'users', title: 'Owner and manager roles', text: 'Owners add managers who share their outlets. Managers record and edit data; only owners delete or manage the team.' },
+  {
+    icon: 'trend',
+    title: 'Real profit per order',
+    text: 'Calculate what remains after platform commission, GST on commission, discounts, packaging and food cost.',
+    tag: 'CORE FEATURE',
+  },
+  {
+    icon: 'dashboard',
+    title: 'Know your best dishes',
+    text: 'Track revenue, profit, margins and order KPIs. Find dishes that earn well and dishes that quietly lose money.',
+    tag: 'ANALYTICS',
+  },
+  {
+    icon: 'sparkles',
+    title: 'AI margin assistant',
+    text: 'Ask questions in plain English. Get answers based on your actual outlet data, orders, menu and fee rules.',
+    tag: 'AI POWERED',
+  },
+  {
+    icon: 'chef',
+    title: 'Detailed menu costing',
+    text: 'Break down dishes into ingredients, calculate recipe costs and understand food cost against selling price.',
+    tag: 'MENU',
+  },
+  {
+    icon: 'percent',
+    title: 'Platform fee rules',
+    text: 'Configure commission and GST rules for Zomato, Swiggy, Direct and other platforms, outlet by outlet.',
+    tag: 'COST CONTROL',
+  },
+  {
+    icon: 'users',
+    title: 'Multi-role access',
+    text: 'Give owners, managers and kitchen staff the access they need, without exposing sensitive profit data to everyone.',
+    tag: 'TEAM',
+  },
 ];
 
 const steps = [
-  { title: 'Add your outlet', text: 'Name it and set the commission each delivery platform charges you.' },
-  { title: 'Cost your menu', text: 'Add dishes with prices and the ingredient cost behind each one.' },
-  { title: 'Record orders', text: 'Log each order with its platform, discount and packaging cost.' },
-  { title: 'Read the margins', text: 'The dashboard and the AI assistant show where you earn and where you lose.' },
+  {
+    number: '01',
+    title: 'Set up your outlet',
+    text: 'Create an outlet and configure the delivery platforms and their commission rules.',
+  },
+  {
+    number: '02',
+    title: 'Cost your menu',
+    text: 'Add dishes, selling prices and the ingredient costs behind every recipe.',
+  },
+  {
+    number: '03',
+    title: 'Record your orders',
+    text: 'Add orders with their platform, discount and packaging costs.',
+  },
+  {
+    number: '04',
+    title: 'Understand your margins',
+    text: 'Use your dashboard and AI assistant to identify where your money goes.',
+  },
 ];
-
-// Worked example with the seeded demo outlet's Zomato rule (25% commission, 18% GST) and Biryani recipe cost
-const example = [
-  { label: 'Order value', value: 450, tone: 'bg-white/20' },
-  { label: 'Zomato commission (25%)', value: -112.5, tone: 'bg-amber-400' },
-  { label: 'GST on commission (18%)', value: -20.25, tone: 'bg-amber-300' },
-  { label: 'Packaging', value: -15, tone: 'bg-cyan-400' },
-  { label: 'Food cost (recipe)', value: -90, tone: 'bg-violet-400' },
-];
-const exampleProfit = example.reduce((s, r) => s + r.value, 0);
 
 const chat = [
-  { role: 'user', text: 'Which dishes lose money?' },
-  { role: 'ai', text: 'Paneer Tikka is your only loss-maker: −₹78 across 3 orders (−14.4% margin). Its ₹95 food cost plus ₹40–60 discounts on every order wipe out the margin. Try capping its discount at ₹20.', tools: ['Margin by dish', 'Discount impact'] },
-  { role: 'user', text: 'What if I raise its price by 15%?' },
-  { role: 'ai', text: 'At ₹207, the same 3 orders would lose about ₹19 instead of ₹78 (margin −3% instead of −14.4%). The price rise helps, but the discounts still need to come down.', tools: ['Price what-if'] },
+  { role: 'user', text: 'Which dishes are losing money?' },
+  {
+    role: 'ai',
+    text: 'Your lowest-margin dishes need attention. I can compare their food costs, discounts and platform fees to find the cause.',
+    tools: ['Dish profitability', 'Discount impact'],
+  },
+  { role: 'user', text: 'What if I increase the selling price?' },
+  {
+    role: 'ai',
+    text: 'I can estimate the impact of a price change using your existing order and cost data.',
+    tools: ['Price what-if'],
+  },
 ];
 
-const rupees = (n) => `${n < 0 ? '−' : ''}₹${Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+const roles = [
+  {
+    role: 'Owner',
+    description: 'Complete control over the business.',
+    color: '#B69AFF',
+    permissions: [
+      'Manage outlets and business data',
+      'View profit and analytics',
+      'Manage team members',
+      'Configure platform fee rules',
+    ],
+  },
+  {
+    role: 'Manager',
+    description: 'Run day-to-day operations.',
+    color: '#7CCBEB',
+    permissions: [
+      'Access assigned outlets',
+      'Manage dishes and orders',
+      'View profit and analytics',
+      'Use the AI assistant',
+    ],
+  },
+  {
+    role: 'Kitchen staff',
+    description: 'Focus on daily operations.',
+    color: GREEN,
+    permissions: [
+      'Access outlet operations',
+      'Add orders',
+      'Access order records',
+      'No access to profit or costs',
+    ],
+  },
+];
+
+const formatINR = (value) =>
+  `₹${Math.abs(value).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 function Nav({ loggedIn }) {
   return (
-    <header className="glass sticky top-0 z-40 border-x-0 border-t-0">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-500/30">
-            <Icon name="chef" className="w-5 h-5" strokeWidth={2.2} />
+    <header className="sticky top-0 z-40 border-b border-[#2A2F2B] bg-[#0C0E0D]/95">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+        <Link to="/" className="flex shrink-0 items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#3DD68C] text-[#07140D]">
+            <Icon name="chef" className="h-5 w-5" />
           </span>
-          <span className="hidden font-bold text-white sm:inline">Kitchen Margin Tracker</span>
+          <span className="text-sm font-bold tracking-tight text-[#F2F4F0] sm:text-base">
+            Kitchen Margin Tracker
+          </span>
         </Link>
-        <nav className="hidden items-center gap-7 text-sm text-slate-300 md:flex">
-          <a href="#features" className="transition hover:text-white">Features</a>
-          <a href="#how" className="transition hover:text-white">How it works</a>
-          <a href="#ai" className="transition hover:text-white">AI assistant</a>
-          <a href="#roles" className="transition hover:text-white">Roles</a>
+
+        <nav className="hidden items-center gap-8 text-xs font-medium text-[#929891] md:flex">
+          <a href="#problem" className="transition-colors duration-150 hover:text-[#3DD68C]">The problem</a>
+          <a href="#features" className="transition-colors duration-150 hover:text-[#3DD68C]">Features</a>
+          <a href="#how" className="transition-colors duration-150 hover:text-[#3DD68C]">How it works</a>
+          <a href="#roles" className="transition-colors duration-150 hover:text-[#3DD68C]">Access</a>
         </nav>
+
         <div className="flex items-center gap-2">
           {loggedIn ? (
-            <Link to="/dashboard" className="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/25 transition hover:brightness-110 active:scale-[0.97]">
-              <span className="sm:hidden">Dashboard</span><span className="hidden sm:inline">Open dashboard</span>
+            <Link
+              to={homePath()}
+              className="rounded-lg bg-[#3DD68C] px-4 py-2.5 text-xs font-bold text-[#07140D] transition-colors duration-150 hover:bg-[#70E8AA]"
+            >
+              Open app <span className="ml-1">↗</span>
             </Link>
           ) : (
             <>
-              <Link to="/login" className="rounded-xl px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10">Log in</Link>
-              <Link to="/register" className="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/25 transition hover:brightness-110 active:scale-[0.97]">
+              <Link
+                to="/login"
+                className="rounded-lg px-3 py-2.5 text-xs font-semibold text-[#C2C8C1] transition-colors duration-150 hover:bg-[#1A1C1B] hover:text-white"
+              >
+                Log in
+              </Link>
+              <Link
+                to="/register"
+                className="rounded-lg bg-[#3DD68C] px-4 py-2.5 text-xs font-bold text-[#07140D] transition-colors duration-150 hover:bg-[#70E8AA]"
+              >
                 Get started
               </Link>
             </>
@@ -73,47 +176,304 @@ function Nav({ loggedIn }) {
   );
 }
 
-// Illustrative dashboard card for the hero, drawn with plain divs and SVG
-function HeroPreview() {
-  const bars = [{ name: 'Chicken Biryani', w: 92, good: true }, { name: 'Veg Fried Rice', w: 34, good: true }, { name: 'Paneer Tikka', w: 14, good: false }];
+function SectionLabel({ children }) {
   return (
-    <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-      <div className="absolute -inset-6 rounded-[2rem] bg-gradient-to-tr from-emerald-500/20 via-cyan-500/10 to-indigo-500/20 blur-2xl" />
-      <div className="glass relative rounded-3xl p-5 animate-scale-in [animation-delay:200ms]">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm font-semibold text-white">My Kitchen · Bengaluru</p>
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">Sample data</span>
+    <p className="mb-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#3DD68C]">
+      <span className="h-px w-7 bg-[#3DD68C]" />
+      {children}
+    </p>
+  );
+}
+
+function Receipt({
+  orderValue = 450,
+  commission = 25,
+  foodCost = 90,
+  packaging = 15,
+  discount = 0,
+}) {
+  const commissionAmount = orderValue * commission / 100;
+  const gst = commissionAmount * 0.18;
+  const profit = orderValue - commissionAmount - gst - foodCost - packaging - discount;
+  const margin = orderValue > 0 ? profit / orderValue * 100 : 0;
+
+  const rows = [
+    { label: 'Order value', value: orderValue, positive: true },
+    { label: `Platform commission (${commission}%)`, value: -commissionAmount },
+    { label: 'GST on commission (18%)', value: -gst },
+    { label: 'Packaging', value: -packaging },
+    { label: 'Food cost', value: -foodCost },
+    ...(discount > 0 ? [{ label: 'Discount', value: -discount }] : []),
+  ];
+
+  return (
+    <div className="overflow-hidden rounded-md bg-[#F2EDE0] text-[#1A1A17] shadow-xl shadow-black/20">
+      <div className="receipt-grain p-6 sm:p-8">
+        <div className="mb-6 flex items-start justify-between border-b border-dashed border-black/25 pb-5">
+          <div>
+            <p className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#5D5F5D]">
+              ORDER PROFIT BREAKDOWN
+            </p>
+            <h3 className="mt-2 font-serif text-2xl font-semibold tracking-tight">
+              Chicken Biryani
+            </h3>
+            <p className="mt-1 text-[11px] text-[#5D5F5D]">
+              Illustrative example · Zomato
+            </p>
+          </div>
+          <span className="border border-black/15 px-2 py-1 font-mono text-[9px] font-bold tracking-wider text-[#5D5F5D]">
+            DEMO
+          </span>
         </div>
-        <div className="mb-4 grid grid-cols-3 gap-2">
-          {[['Revenue', '₹2,800', 'text-white'], ['Profit', '₹1,108', 'text-emerald-300'], ['Margin', '39.6%', 'text-white']].map(([l, v, c]) => (
-            <div key={l} className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400">{l}</p>
-              <p className={`mt-1 text-lg font-bold ${c}`}>{v}</p>
+
+        <div className="space-y-4 font-mono text-xs tabular-nums sm:text-sm">
+          {rows.map((row) => (
+            <div key={row.label} className="flex items-center justify-between gap-4">
+              <span className={row.positive ? 'font-bold text-[#1A1A17]' : 'text-[#5D5F5D]'}>
+                {row.label}
+              </span>
+              <span className={row.positive ? 'font-bold text-[#1A1A17]' : 'font-medium text-[#B5242F]'}>
+                {row.positive ? '' : '−'}{formatINR(row.value)}
+              </span>
             </div>
           ))}
         </div>
-        <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
-          <p className="mb-2 text-xs font-semibold text-slate-300">Profit by dish</p>
-          <div className="space-y-2">
-            {bars.map((b, i) => (
-              <div key={b.name} className="flex items-center gap-2">
-                <span className="w-28 shrink-0 truncate text-[11px] text-slate-400">{b.name}</span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/5">
-                  <div style={{ width: `${b.w}%`, animationDelay: `${500 + i * 150}ms` }}
-                    className={`h-full origin-left rounded-full animate-[grow_0.9s_cubic-bezier(0.22,1,0.36,1)_both] ${b.good ? 'bg-gradient-to-r from-emerald-500 to-cyan-400' : 'bg-gradient-to-r from-rose-500 to-rose-400'}`} />
-                </div>
-              </div>
-            ))}
+
+        <div className="my-6 border-t border-dashed border-black/30" />
+
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#006D41]">
+              Actual profit
+            </p>
+            <p className="mt-1 text-[10px] text-[#5D5F5D]">
+              After the listed costs
+            </p>
+          </div>
+          <div className="text-right">
+            <p className={`font-mono text-2xl font-bold tracking-tight sm:text-3xl ${profit >= 0 ? 'text-[#006D41]' : 'text-[#B5242F]'}`}>
+              {profit < 0 ? '−' : ''}{formatINR(profit)}
+            </p>
+            <p className="mt-1 font-mono text-[11px] font-bold text-[#5D5F5D]">
+              {margin.toFixed(1)}% margin
+            </p>
           </div>
         </div>
-        <div className="flex items-start gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
-          <Icon name="sparkles" className="mt-0.5 w-4 h-4 shrink-0 text-violet-300" />
-          <p className="text-xs text-slate-200"><span className="font-semibold text-white">Paneer Tikka</span> is losing ₹26 per order. Heavy Swiggy discounts are the main cause.</p>
+
+        <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-black/10">
+          <div
+            className={`h-full rounded-full transition-[width] duration-300 ${profit >= 0 ? 'bg-[#00864F]' : 'bg-[#C22D38]'}`}
+            style={{ width: `${Math.min(100, Math.max(0, margin))}%` }}
+          />
         </div>
       </div>
-      <div className="glass absolute -bottom-16 right-6 hidden rounded-2xl px-4 py-3 sm:block animate-[float_6s_ease-in-out_infinite]">
-        <p className="text-[10px] uppercase tracking-wider text-slate-400">Direct orders margin</p>
-        <p className="text-lg font-bold text-emerald-300">74.1%</p>
+      <div className="receipt-teeth h-3" />
+    </div>
+  );
+}
+
+function HeroPreview() {
+  const bars = [
+    { name: 'Chicken Biryani', width: '88%', amount: '₹212', positive: true },
+    { name: 'Veg Fried Rice', width: '58%', amount: '₹140', positive: true },
+    { name: 'Paneer Tikka', width: '13%', amount: '−₹26', positive: false },
+  ];
+
+  return (
+    <div className="w-full rounded-xl border border-[#2A2F2B] bg-[#151816] p-5 sm:p-7">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <p className="font-mono text-[9px] tracking-[0.15em] text-[#858D85]">
+            BUSINESS OVERVIEW
+          </p>
+          <h3 className="mt-1 text-lg font-semibold text-[#F2F4F0]">
+            Kitchen performance
+          </h3>
+        </div>
+        <span className="rounded-md border border-[#2A2F2B] bg-[#1A1C1B] px-2.5 py-1 font-mono text-[9px] text-[#929891]">
+          SAMPLE DATA
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { label: 'Revenue', value: '₹2,800', color: 'text-[#F2F4F0]' },
+          { label: 'Profit', value: '₹1,108', color: 'text-[#3DD68C]' },
+          { label: 'Margin', value: '39.6%', color: 'text-[#F2F4F0]' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-lg border border-[#2A2F2B] bg-[#1A1C1B] p-3 sm:p-4">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-[#858D85]">
+              {item.label}
+            </p>
+            <p className={`mt-2 font-mono text-base font-bold tracking-tight sm:text-xl ${item.color}`}>
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 rounded-lg border border-[#2A2F2B] bg-[#1A1C1B] p-4">
+        <div className="mb-5 flex items-center justify-between">
+          <p className="text-xs font-semibold text-[#F2F4F0]">Profit by dish</p>
+          <span className="font-mono text-[9px] text-[#858D85]">TOP PERFORMERS</span>
+        </div>
+
+        <div className="space-y-5">
+          {bars.map((bar) => (
+            <div key={bar.name}>
+              <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+                <span className="text-[#C2C8C1]">{bar.name}</span>
+                <span className={`font-mono font-bold ${bar.positive ? 'text-[#3DD68C]' : 'text-[#E5484D]'}`}>
+                  {bar.amount}
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#2A2F2B]">
+                <div
+                  className={`h-full rounded-full transition-[width] duration-500 ${bar.positive ? 'bg-[#3DD68C]' : 'bg-[#E5484D]'}`}
+                  style={{ width: bar.width }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-start gap-3 rounded-lg border border-[#65502A] bg-[#211D16] p-4">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#F2B134]/10 text-[#F2B134]">
+          <Icon name="sparkles" className="h-4 w-4" />
+        </span>
+        <div>
+          <p className="text-xs font-semibold text-[#F2B134]">Find the margin leak</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-[#BDB29B]">
+            Identify dishes where food costs, discounts and platform fees are eating into your profit.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfitCalculator() {
+  const [order, setOrder] = useState('450');
+  const [commission, setCommission] = useState('25');
+  const [food, setFood] = useState('90');
+  const [packaging, setPackaging] = useState('15');
+  const [discount, setDiscount] = useState('0');
+
+  const orderValue = Math.max(0, Number(order) || 0);
+  const commissionRate = Math.min(100, Math.max(0, Number(commission) || 0));
+  const foodCost = Math.max(0, Number(food) || 0);
+  const packagingCost = Math.max(0, Number(packaging) || 0);
+  const discountCost = Math.max(0, Number(discount) || 0);
+
+  const commissionAmount = orderValue * commissionRate / 100;
+  const gst = commissionAmount * 0.18;
+  const profit = orderValue - commissionAmount - gst - foodCost - packagingCost - discountCost;
+  const margin = orderValue > 0 ? profit / orderValue * 100 : 0;
+
+  const fields = [
+    { label: 'Order value', value: order, setter: setOrder },
+    { label: 'Commission', suffix: '%', value: commission, setter: setCommission },
+    { label: 'Food cost', value: food, setter: setFood },
+    { label: 'Packaging cost', value: packaging, setter: setPackaging },
+    { label: 'Discount', value: discount, setter: setDiscount },
+  ];
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#2A2F2B] bg-[#151816]">
+      <div className="border-b border-[#2A2F2B] p-6 sm:p-8">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#3DD68C]">
+              INTERACTIVE CALCULATOR
+            </p>
+            <h3 className="mt-2 text-xl font-semibold text-[#F2F4F0]">
+              Calculate your order profit
+            </h3>
+          </div>
+          <span className="rounded-lg border border-[#2A2F2B] bg-[#1A1C1B] p-3 text-[#3DD68C]">
+            <Icon name="percent" className="h-5 w-5" />
+          </span>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-[#929891]">
+          Change the values to see how much of the order you actually keep.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2">
+        <div className="space-y-4 p-6 sm:p-8">
+          {fields.map((field) => (
+            <label key={field.label} className="block">
+              <span className="mb-2 block text-[11px] font-semibold text-[#C2C8C1]">
+                {field.label}
+              </span>
+              <div className="flex items-center rounded-lg border border-[#2A2F2B] bg-[#0C0E0D] px-3 transition-colors duration-150 focus-within:border-[#3DD68C]">
+                {field.suffix !== '%' && (
+                  <span className="font-mono text-xs text-[#858D85]">₹</span>
+                )}
+                <input
+                  type="number"
+                  min="0"
+                  max={field.suffix === '%' ? '100' : undefined}
+                  step="any"
+                  value={field.value}
+                  onChange={(e) => field.setter(e.target.value)}
+                  className="w-full bg-transparent px-2 py-3 font-mono text-sm font-semibold text-[#F2F4F0] outline-none"
+                />
+                {field.suffix === '%' && (
+                  <span className="font-mono text-xs text-[#858D85]">%</span>
+                )}
+              </div>
+            </label>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => {
+              setOrder('450');
+              setCommission('25');
+              setFood('90');
+              setPackaging('15');
+              setDiscount('0');
+            }}
+            className="pt-1 text-[11px] font-semibold text-[#3DD68C] transition-colors duration-150 hover:text-[#70E8AA]"
+          >
+            Reset example ↺
+          </button>
+        </div>
+
+        <div className="flex flex-col justify-center border-t border-[#2A2F2B] bg-[#1A1C1B] p-6 sm:p-8 md:border-l md:border-t-0">
+          <p className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#858D85]">
+            ESTIMATED PROFIT
+          </p>
+          <p className={`mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl ${profit >= 0 ? 'text-[#3DD68C]' : 'text-[#E5484D]'}`}>
+            {profit < 0 ? '−' : ''}{formatINR(profit)}
+          </p>
+          <p className="mt-2 text-xs text-[#929891]">
+            {margin.toFixed(1)}% profit margin
+          </p>
+
+          <div className="my-7 h-px bg-[#2A2F2B]" />
+
+          <div className="space-y-3 text-xs">
+            <div className="flex justify-between gap-3 text-[#929891]">
+              <span>Platform commission</span>
+              <span className="font-mono text-[#E5484D]">−{formatINR(commissionAmount)}</span>
+            </div>
+            <div className="flex justify-between gap-3 text-[#929891]">
+              <span>GST on commission (18%)</span>
+              <span className="font-mono text-[#E5484D]">−{formatINR(gst)}</span>
+            </div>
+            <div className="flex justify-between gap-3 text-[#929891]">
+              <span>Food + packaging + discount</span>
+              <span className="font-mono text-[#E5484D]">−{formatINR(foodCost + packagingCost + discountCost)}</span>
+            </div>
+          </div>
+
+          <p className="mt-6 rounded-lg border border-[#2A2F2B] bg-[#151816] p-3 text-[10px] leading-relaxed text-[#858D85]">
+            Illustrative calculation. Actual platform deductions and applicable taxes may vary. This calculator is not connected to your account.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -121,198 +481,428 @@ function HeroPreview() {
 
 export default function Landing() {
   const loggedIn = !!localStorage.getItem('token');
-  const startTo = loggedIn ? '/dashboard' : '/register';
+  const startTo = loggedIn ? homePath() : '/register';
 
   return (
-    <div className="min-h-screen overflow-x-hidden">
-      <Backdrop />
-      <style>{`@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}`}</style>
+    <div className="min-h-screen overflow-x-hidden bg-[#0C0E0D] text-[#F2F4F0]">
+      <style>{`
+        html {
+          scroll-behavior: smooth;
+        }
+
+        .receipt-grain {
+          background-image: repeating-linear-gradient(
+            0deg,
+            rgba(26, 26, 23, .018) 0px,
+            rgba(26, 26, 23, .018) 1px,
+            transparent 1px,
+            transparent 4px
+          );
+        }
+
+        .receipt-teeth {
+          background:
+            linear-gradient(135deg, #F2EDE0 50%, transparent 50%) 0 0 / 16px 16px,
+            linear-gradient(225deg, #F2EDE0 50%, transparent 50%) 0 0 / 16px 16px;
+          background-repeat: repeat-x;
+          background-position: top;
+        }
+
+        .landing-reveal {
+          animation: landing-enter .55s cubic-bezier(.2,.7,.2,1) both;
+        }
+
+        @keyframes landing-enter {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          html {
+            scroll-behavior: auto;
+          }
+          .landing-reveal {
+            animation: none;
+          }
+        }
+      `}</style>
+
       <Nav loggedIn={loggedIn} />
 
-      {/* Hero */}
-      <section className="mx-auto grid max-w-6xl items-center gap-14 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-2 lg:pt-24">
-        <div>
-          <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200 animate-fade-up">
-            <Icon name="chef" className="w-3.5 h-3.5" /> For cloud kitchens on Zomato, Swiggy and direct orders
-          </span>
-          <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-6xl animate-fade-up [animation-delay:80ms]">
-            Sales look great. <span className="text-gradient">Is that dish making money?</span>
-          </h1>
-          <p className="mt-6 max-w-xl text-lg text-slate-300 animate-fade-up [animation-delay:160ms]">
-            Kitchen Margin Tracker works out the real profit on every order after commission, GST, discounts,
-            packaging and food cost, then shows you, and an AI assistant, exactly where the margin goes.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3 animate-fade-up [animation-delay:240ms]">
-            <Link to={startTo} className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-6 py-3 font-semibold text-slate-950 shadow-lg shadow-emerald-500/30 transition hover:brightness-110 active:scale-[0.97]">
-              {loggedIn ? 'Open your dashboard' : 'Create a free owner account'}
-              <Icon name="arrowRight" className="w-4 h-4 transition group-hover:translate-x-1" />
-            </Link>
-            <a href="#how" className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3 font-semibold text-slate-100 transition hover:bg-white/10">
-              See how it works
-            </a>
-          </div>
-          <dl className="mt-10 grid max-w-md grid-cols-3 gap-4 animate-fade-up [animation-delay:320ms]">
-            {[['5', 'costs deducted per order'], ['10', 'AI data tools'], ['2', 'user roles']].map(([n, l]) => (
-              <div key={l}>
-                <dt className="text-3xl font-bold text-white">{n}</dt>
-                <dd className="text-xs text-slate-400">{l}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        <HeroPreview />
-      </section>
+      <main>
+        {/* HERO */}
+        <section className="mx-auto grid max-w-7xl items-center gap-14 px-5 pb-24 pt-20 sm:px-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-16 lg:pb-32 lg:pt-28">
+          <div className="landing-reveal">
+            <div className="mb-7 inline-flex items-center gap-2 rounded-md border border-[#2A2F2B] bg-[#151816] px-3 py-2 font-mono text-[9px] font-bold tracking-[0.15em] text-[#3DD68C]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#3DD68C]" />
+              BUILT FOR INDIA'S FOOD BUSINESSES
+            </div>
 
-      {/* Problem: where a ₹450 order goes */}
-      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <Reveal className="mx-auto mb-10 max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">The problem</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">A ₹450 order is not ₹450 in your pocket</h2>
-          <p className="mt-3 text-slate-400">Here is one Chicken Biryani order on Zomato, using the demo outlet's fee rule and recipe cost.</p>
-        </Reveal>
-        <Reveal className="glass mx-auto max-w-3xl rounded-3xl p-6 sm:p-8">
-          <div className="space-y-3">
-            {example.map((row, i) => (
-              <div key={row.label} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 sm:grid-cols-[13rem_1fr_6rem]">
-                <span className="text-sm text-slate-300">{row.label}</span>
-                <div className="col-span-2 row-start-2 h-3 overflow-hidden rounded-full bg-white/5 sm:col-span-1 sm:row-start-auto">
-                  <div style={{ width: `${(Math.abs(row.value) / 450) * 100}%`, animationDelay: `${i * 120}ms` }}
-                    className={`h-full origin-left rounded-full animate-[grow_1s_cubic-bezier(0.22,1,0.36,1)_both] ${row.tone}`} />
+            <h1 className="max-w-3xl font-serif text-5xl font-semibold leading-[1.08] tracking-[-0.04em] text-[#F2F4F0] sm:text-6xl lg:text-[4.6rem]">
+              Revenue is not
+              <span className="mt-1 block italic text-[#3DD68C]">
+                your profit.
+              </span>
+            </h1>
+
+            <p className="mt-7 max-w-xl text-sm leading-8 text-[#929891] sm:text-base">
+              Every order has a cost hiding behind it. Platform commissions,
+              GST, discounts, packaging and ingredients all take a cut.
+              Kitchen Margin Tracker shows you what you actually keep.
+            </p>
+
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Link
+                to={startTo}
+                className="group inline-flex items-center gap-3 rounded-lg bg-[#3DD68C] px-6 py-4 text-xs font-bold text-[#07140D] transition-colors duration-150 hover:bg-[#70E8AA]"
+              >
+                {loggedIn ? 'Open your app' : 'Get started'}
+                <Icon name="arrowRight" className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-1" />
+              </Link>
+              <a
+                href="#problem"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#2A2F2B] px-6 py-4 text-xs font-semibold text-[#C2C8C1] transition-colors duration-150 hover:border-[#3DD68C] hover:text-[#3DD68C]"
+              >
+                See where it goes <span>↓</span>
+              </a>
+            </div>
+
+            <div className="mt-12 flex flex-wrap gap-x-8 gap-y-4 border-t border-[#2A2F2B] pt-7">
+              {[
+                ['01', 'Order-level profit'],
+                ['02', 'Outlet analytics'],
+                ['03', 'AI-assisted insights'],
+              ].map(([number, label]) => (
+                <div key={number} className="flex items-center gap-3">
+                  <span className="font-mono text-[10px] text-[#3DD68C]">{number}</span>
+                  <span className="text-[11px] font-medium text-[#929891]">{label}</span>
                 </div>
-                <span className={`text-right text-sm font-semibold ${row.value < 0 ? 'text-rose-300' : 'text-white'}`}>{rupees(row.value)}</span>
-              </div>
-            ))}
-            <div className="mt-2 grid grid-cols-[1fr_auto] items-center gap-4 border-t border-white/10 pt-4 sm:grid-cols-[13rem_1fr_6rem]">
-              <span className="font-semibold text-white">Actual profit</span>
-              <div className="hidden h-3 overflow-hidden rounded-full bg-white/5 sm:block">
-                <div style={{ width: `${(exampleProfit / 450) * 100}%` }} className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400" />
-              </div>
-              <span className="text-right text-lg font-bold text-emerald-300">{rupees(exampleProfit)}</span>
+              ))}
             </div>
           </div>
-          <p className="mt-5 text-sm text-slate-400">That is a {((exampleProfit / 450) * 100).toFixed(1)}% margin before any discount. Add a ₹60 discount on a cheaper dish and it can go negative, which is exactly what the dashboard catches.</p>
-        </Reveal>
-      </section>
 
-      {/* Features */}
-      <section id="features" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20 sm:px-6">
-        <Reveal className="mx-auto mb-12 max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">Features</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">Everything between the order and the profit</h2>
-        </Reveal>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f, i) => (
-            <Reveal key={f.title} delay={i * 80} className="glass group rounded-2xl p-6 hover:-translate-y-1 hover:border-white/20">
-              <span className="mb-4 inline-flex rounded-xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 p-3 text-emerald-300 ring-1 ring-white/10 transition duration-300 group-hover:scale-110 group-hover:rotate-3">
-                <Icon name={f.icon} />
-              </span>
-              <h3 className="font-semibold text-white">{f.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">{f.text}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20 sm:px-6">
-        <Reveal className="mx-auto mb-12 max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">How it works</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">Four steps to your real margins</h2>
-        </Reveal>
-        <ol className="grid gap-5 md:grid-cols-4">
-          {steps.map((s, i) => (
-            <Reveal as="li" key={s.title} delay={i * 100} className="glass relative rounded-2xl p-6">
-              <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 text-sm font-bold text-slate-950">{i + 1}</span>
-              <h3 className="font-semibold text-white">{s.title}</h3>
-              <p className="mt-2 text-sm text-slate-400">{s.text}</p>
-            </Reveal>
-          ))}
-        </ol>
-      </section>
-
-      {/* AI assistant */}
-      <section id="ai" className="mx-auto grid max-w-6xl scroll-mt-24 items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2">
-        <Reveal>
-          <p className="text-sm font-semibold uppercase tracking-widest text-violet-300">AI assistant</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">Ask your numbers a question</h2>
-          <p className="mt-4 text-slate-300">
-            The assistant runs on Groq (with Google Gemini as backup) using function calling. It never guesses: it picks from 10 tools that
-            read your outlet's orders, menu and fee rules, follows the dashboard filters, and remembers the conversation
-            so you can ask follow-ups.
-          </p>
-          <ul className="mt-6 space-y-3 text-sm text-slate-300">
-            {['Find loss-making dishes and costly platforms', 'See where revenue goes: commission, GST, discounts, food cost', 'Test a price change before you make it', 'One-click insight cards on the dashboard'].map((t) => (
-              <li key={t} className="flex items-start gap-3">
-                <span className="mt-0.5 rounded-full bg-violet-500/20 p-1 text-violet-300"><Icon name="check" className="w-3 h-3" /></span>{t}
-              </li>
-            ))}
-          </ul>
-        </Reveal>
-        <Reveal delay={120} className="glass rounded-3xl p-5">
-          <div className="mb-4 flex items-center gap-2 border-b border-white/10 pb-4">
-            <span className="rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 p-1.5 text-white"><Icon name="sparkles" className="w-4 h-4" /></span>
-            <span className="text-sm font-semibold text-white">Ask the assistant</span>
-            <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">Example</span>
+          <div className="landing-reveal mx-auto w-full max-w-md" style={{ animationDelay: '100ms' }}>
+            <Receipt />
+            <p className="mt-5 text-center text-[10px] text-[#858D85]">
+              Example calculation · Your own menu costs and fee rules go into the app
+            </p>
           </div>
-          <div className="space-y-3">
-            {chat.map((m, i) => (
-              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className="max-w-[85%]">
-                  <div className={`rounded-2xl px-4 py-2.5 text-sm ${m.role === 'user' ? 'rounded-br-md bg-gradient-to-r from-emerald-500 to-cyan-500 font-medium text-slate-950' : 'rounded-bl-md border border-white/10 bg-white/[0.06] text-slate-100'}`}>
-                    {m.text}
+        </section>
+
+        {/* PROBLEM */}
+        <section id="problem" className="scroll-mt-20 border-y border-[#2A2F2B] bg-[#121513]">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-2 lg:py-28">
+            <Reveal>
+              <SectionLabel>The hidden cost</SectionLabel>
+              <h2 className="font-serif text-3xl font-semibold leading-tight tracking-tight text-[#F2F4F0] sm:text-5xl">
+                The same dish.
+                <span className="block text-[#858D85]">Different profit.</span>
+              </h2>
+              <p className="mt-6 max-w-lg text-sm leading-8 text-[#929891] sm:text-base">
+                A dish can sell hundreds of times and still deliver disappointing
+                margins. The platform, its commission, discounts and your recipe
+                cost all change the final number.
+              </p>
+              <div className="mt-8 space-y-4">
+                {[
+                  'A high order value does not guarantee high profit.',
+                  'Different platforms can leave you with different margins.',
+                  'A discount can turn a profitable order into a loss.',
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-3 text-xs text-[#C2C8C1]">
+                    <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-[#3DD68C]" />
+                    {item}
                   </div>
-                  {m.tools && (
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {m.tools.map((t) => <span key={t} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-400">{t}</span>)}
+                ))}
+              </div>
+            </Reveal>
+
+            <Reveal delay={100}>
+              <ProfitCalculator />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* PRODUCT PREVIEW */}
+        <section className="mx-auto grid max-w-7xl items-center gap-14 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:py-32">
+          <Reveal>
+            <HeroPreview />
+          </Reveal>
+          <Reveal delay={100}>
+            <SectionLabel>One clear picture</SectionLabel>
+            <h2 className="font-serif text-3xl font-semibold leading-tight tracking-tight text-[#F2F4F0] sm:text-5xl">
+              Stop managing by revenue.
+              <span className="block text-[#3DD68C]">Start managing by margin.</span>
+            </h2>
+            <p className="mt-6 max-w-xl text-sm leading-8 text-[#929891] sm:text-base">
+              See how your outlets, dishes and orders are performing.
+              Understand where costs are accumulating and which parts of
+              your menu deserve attention.
+            </p>
+            <Link
+              to={startTo}
+              className="mt-8 inline-flex items-center gap-2 text-xs font-bold text-[#3DD68C] transition-colors duration-150 hover:text-[#70E8AA]"
+            >
+              Explore Kitchen Margin Tracker
+              <Icon name="arrowRight" className="h-4 w-4" />
+            </Link>
+          </Reveal>
+        </section>
+
+        {/* FEATURES */}
+        <section id="features" className="scroll-mt-20 border-y border-[#2A2F2B] bg-[#121513]">
+          <div className="mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:py-28">
+            <Reveal className="mx-auto mb-14 max-w-2xl text-center">
+              <div className="flex justify-center">
+                <SectionLabel>What you get</SectionLabel>
+              </div>
+              <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#F2F4F0] sm:text-5xl">
+                Every cost. Every outlet.
+                <span className="block text-[#858D85]">A clearer picture.</span>
+              </h2>
+              <p className="mt-5 text-xs leading-7 text-[#929891] sm:text-sm">
+                The tools to understand the economics of your kitchen,
+                from an individual order to your overall business.
+              </p>
+            </Reveal>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {features.map((feature, index) => (
+                <Reveal
+                  key={feature.title}
+                  delay={index * 50}
+                  className="group rounded-xl border border-[#2A2F2B] bg-[#151816] p-6 transition-colors duration-150 hover:border-[#3DD68C]/50 hover:bg-[#1A1C1B]"
+                >
+                  <div className="mb-8 flex items-center justify-between">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#2A2F2B] bg-[#1A1C1B] text-[#3DD68C] transition-colors duration-150 group-hover:border-[#3DD68C]/40">
+                      <Icon name={feature.icon} className="h-5 w-5" />
+                    </span>
+                    <span className="font-mono text-[9px] font-bold tracking-[0.13em] text-[#858D85]">
+                      {feature.tag}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold text-[#F2F4F0]">
+                    {feature.title}
+                  </h3>
+                  <p className="mt-3 text-xs leading-7 text-[#929891]">
+                    {feature.text}
+                  </p>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* HOW IT WORKS */}
+        <section id="how" className="scroll-mt-20 mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:py-28">
+          <Reveal className="mx-auto mb-16 max-w-2xl text-center">
+            <div className="flex justify-center">
+              <SectionLabel>Simple workflow</SectionLabel>
+            </div>
+            <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#F2F4F0] sm:text-5xl">
+              From order to insight.
+              <span className="block text-[#858D85]">Four steps.</span>
+            </h2>
+          </Reveal>
+
+          <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {steps.map((step, index) => (
+              <Reveal
+                as="li"
+                key={step.number}
+                delay={index * 60}
+                className="rounded-xl border border-[#2A2F2B] bg-[#151816] p-6 transition-colors duration-150 hover:border-[#3DD68C]/40"
+              >
+                <p className="font-mono text-xs font-bold text-[#3DD68C]">
+                  {step.number}
+                </p>
+                <div className="my-7 h-px bg-[#2A2F2B]" />
+                <h3 className="text-base font-semibold text-[#F2F4F0]">
+                  {step.title}
+                </h3>
+                <p className="mt-3 text-xs leading-7 text-[#929891]">
+                  {step.text}
+                </p>
+              </Reveal>
+            ))}
+          </ol>
+        </section>
+
+        {/* AI */}
+        <section id="ai" className="scroll-mt-20 border-y border-[#2A2F2B] bg-[#121513]">
+          <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:py-28">
+            <Reveal>
+              <SectionLabel>Ask your data</SectionLabel>
+              <h2 className="font-serif text-3xl font-semibold leading-tight tracking-tight text-[#F2F4F0] sm:text-5xl">
+                Your numbers have answers.
+                <span className="block text-[#3DD68C]">Ask the AI.</span>
+              </h2>
+              <p className="mt-6 max-w-lg text-sm leading-8 text-[#929891] sm:text-base">
+                Instead of digging through reports, ask questions in plain English.
+                The AI assistant uses your business data to help explain performance
+                and explore possible changes.
+              </p>
+              <div className="mt-8 space-y-4">
+                {[
+                  'Find dishes with weak or negative margins.',
+                  'Understand how discounts and platform fees affect profit.',
+                  'Explore the impact of changing a dish price.',
+                  'Ask follow-up questions in the same conversation.',
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-3 text-xs text-[#C2C8C1]">
+                    <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-[#3DD68C]" />
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+
+            <Reveal delay={100}>
+              <div className="rounded-xl border border-[#2A2F2B] bg-[#151816] p-5 sm:p-7">
+                <div className="mb-6 flex items-center gap-3 border-b border-[#2A2F2B] pb-5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#2A2F2B] bg-[#1A1C1B] text-[#3DD68C]">
+                    <Icon name="sparkles" className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-[#F2F4F0]">
+                      Margin assistant
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-[#858D85]">
+                      Illustrative conversation
+                    </p>
+                  </div>
+                  <span className="ml-auto font-mono text-[9px] font-semibold text-[#3DD68C]">
+                    AI DEMO
+                  </span>
+                </div>
+
+                <div className="space-y-5">
+                  {chat.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className="max-w-[90%]">
+                        <div className={`rounded-lg px-4 py-3 text-xs leading-6 ${message.role === 'user'
+                            ? 'bg-[#3DD68C] font-medium text-[#07140D]'
+                            : 'border border-[#2A2F2B] bg-[#1A1C1B] text-[#C2C8C1]'
+                          }`}>
+                          {message.text}
+                        </div>
+                        {message.tools && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {message.tools.map((tool) => (
+                              <span key={tool} className="rounded-md border border-[#2A2F2B] px-2.5 py-1 font-mono text-[9px] text-[#929891]">
+                                {tool}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  ))}
+                </div>
+
+                <div className="mt-6 flex items-center justify-between rounded-lg border border-[#2A2F2B] bg-[#0C0E0D] px-4 py-3">
+                  <span className="text-[11px] text-[#858D85]">
+                    Ask about your business...
+                  </span>
+                  <span className="rounded-md bg-[#3DD68C] p-2 text-[#07140D]">
+                    <Icon name="sparkles" className="h-4 w-4" />
+                  </span>
                 </div>
               </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ROLES */}
+        <section id="roles" className="scroll-mt-20 mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:py-28">
+          <Reveal className="mx-auto mb-14 max-w-2xl text-center">
+            <div className="flex justify-center">
+              <SectionLabel>Built for teams</SectionLabel>
+            </div>
+            <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#F2F4F0] sm:text-5xl">
+              The right access.
+              <span className="block text-[#858D85]">For the right people.</span>
+            </h2>
+          </Reveal>
+
+          <div className="mx-auto grid max-w-5xl gap-3 md:grid-cols-3">
+            {roles.map((role, index) => (
+              <Reveal
+                key={role.role}
+                delay={index * 60}
+                className="rounded-xl border border-[#2A2F2B] bg-[#151816] p-6 transition-colors duration-150 hover:border-[#3DD68C]/30"
+              >
+                <span
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.15em]"
+                  style={{ color: role.color }}
+                >
+                  {role.role}
+                </span>
+                <h3 className="mt-4 text-lg font-semibold text-[#F2F4F0]">
+                  {role.description}
+                </h3>
+                <div className="my-6 h-px bg-[#2A2F2B]" />
+                <ul className="space-y-4">
+                  {role.permissions.map((permission) => (
+                    <li key={permission} className="flex items-start gap-3 text-xs text-[#929891]">
+                      <Icon
+                        name="check"
+                        className="mt-0.5 h-4 w-4 shrink-0"
+                        style={{ color: role.color }}
+                      />
+                      {permission}
+                    </li>
+                  ))}
+                </ul>
+              </Reveal>
             ))}
           </div>
-        </Reveal>
-      </section>
+        </section>
 
-      {/* Roles */}
-      <section id="roles" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20 sm:px-6">
-        <Reveal className="mx-auto mb-10 max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">Roles</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">Bring your kitchen manager along</h2>
-        </Reveal>
-        <div className="mx-auto grid max-w-4xl gap-5 md:grid-cols-2">
-          {[
-            { role: 'Owner', tone: 'from-violet-400 to-indigo-500', can: ['Everything a manager can do', 'Delete outlets, dishes, orders and fee rules', 'Add or remove delivery platforms', 'Add, edit and remove managers'] },
-            { role: 'Manager', tone: 'from-cyan-400 to-emerald-500', can: ['Works on the owner\'s outlets', 'Add and edit dishes, recipe costs, orders, fee rules', 'Full dashboard and AI assistant', 'Cannot delete records or manage the team'] },
-          ].map((r, i) => (
-            <Reveal key={r.role} delay={i * 120} className="glass rounded-2xl p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <span className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${r.tone} font-bold text-white`}>{r.role[0]}</span>
-                <h3 className="text-lg font-semibold text-white">{r.role}</h3>
-              </div>
-              <ul className="space-y-2 text-sm text-slate-300">
-                {r.can.map((c) => <li key={c} className="flex gap-2"><Icon name="check" className="mt-0.5 w-4 h-4 shrink-0 text-emerald-300" />{c}</li>)}
-              </ul>
-            </Reveal>
-          ))}
-        </div>
-      </section>
+        {/* CTA */}
+        <section className="mx-auto max-w-7xl px-5 pb-24 sm:px-8 lg:pb-32">
+          <Reveal className="rounded-xl border border-[#2A2F2B] bg-[#151816] px-6 py-16 text-center sm:px-12 sm:py-20">
+            <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[#3DD68C]">
+              MAKE EVERY ORDER COUNT
+            </p>
+            <h2 className="mx-auto mt-5 max-w-3xl font-serif text-3xl font-semibold tracking-tight text-[#F2F4F0] sm:text-5xl">
+              Know what your kitchen earns.
+              <span className="block text-[#3DD68C]">Not just what it sells.</span>
+            </h2>
+            <p className="mx-auto mt-5 max-w-xl text-xs leading-7 text-[#929891] sm:text-sm">
+              Start tracking the real economics behind your orders,
+              dishes and outlets.
+            </p>
+            <Link
+              to={startTo}
+              className="mt-9 inline-flex items-center gap-3 rounded-lg bg-[#3DD68C] px-7 py-4 text-xs font-bold text-[#07140D] transition-colors duration-150 hover:bg-[#70E8AA]"
+            >
+              {loggedIn ? 'Open your dashboard' : 'Create your account'}
+              <Icon name="arrowRight" className="h-4 w-4" />
+            </Link>
+          </Reveal>
+        </section>
+      </main>
 
-      {/* CTA */}
-      <section className="mx-auto max-w-6xl px-4 pb-24 pt-10 sm:px-6">
-        <Reveal className="glass relative overflow-hidden rounded-3xl p-10 text-center sm:p-14">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-500/15 via-cyan-500/10 to-indigo-500/15" />
-          <h2 className="relative text-3xl font-bold text-white sm:text-4xl">Find your losing dish today</h2>
-          <p className="relative mx-auto mt-3 max-w-xl text-slate-300">Set up an outlet in a few minutes and see what every order really earns.</p>
-          <Link to={startTo} className="relative mt-8 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-7 py-3.5 font-semibold text-slate-950 shadow-lg shadow-emerald-500/30 transition hover:brightness-110 active:scale-[0.97]">
-            {loggedIn ? 'Open your dashboard' : 'Get started'} <Icon name="arrowRight" className="w-4 h-4" />
+      {/* FOOTER */}
+      <footer className="border-t border-[#2A2F2B]">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-5 py-8 text-center sm:flex-row sm:px-8 sm:text-left">
+          <Link to="/" className="flex items-center gap-2 text-xs font-semibold text-[#C2C8C1]">
+            <Icon name="chef" className="h-4 w-4 text-[#3DD68C]" />
+            Kitchen Margin Tracker
           </Link>
-        </Reveal>
-      </section>
-
-      <footer className="border-t border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-slate-400 sm:flex-row sm:px-6">
-          <span className="flex items-center gap-2"><Icon name="chef" className="w-4 h-4 text-emerald-300" /> Kitchen Margin Tracker</span>
-          <span>24CIE554 Full Stack Development · Nishita Shirwal &amp; Reyansh Keshava</span>
+          <p className="text-[10px] text-[#858D85]">
+            24CIE554 Full Stack Development · Nishita Shirwal &amp; Reyansh Keshava
+          </p>
         </div>
       </footer>
     </div>

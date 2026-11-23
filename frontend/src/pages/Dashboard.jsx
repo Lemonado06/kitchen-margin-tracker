@@ -1,43 +1,204 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Bar, Cell, AreaChart, Area, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  Cell,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
+
 import api, { getUser } from '../api/client';
 import AIChat from '../components/AIChat';
 import AIInsights from '../components/AIInsights';
 import OutletPicker from '../components/OutletPicker';
 import { formatINR } from '../hooks';
 import Icon from '../components/Icon';
-import { AnimatedNumber, Badge, Button, Card, EmptyState, ErrorText, Field, Input, PageHeader, Select, Skeleton } from '../components/ui';
+import { Button, EmptyState, ErrorText, Field, Input, Select, Skeleton } from '../components/ui';
 
-const axisProps = { stroke: 'rgb(148 163 184 / 0.4)', tick: { fill: '#94a3b8', fontSize: 11 }, tickLine: false };
-const tooltipProps = {
-  contentStyle: { background: 'rgb(15 23 42 / 0.9)', border: '1px solid rgb(255 255 255 / 0.12)', borderRadius: 12, backdropFilter: 'blur(12px)' },
-  labelStyle: { color: '#e2e8f0', fontWeight: 600 },
-  itemStyle: { color: '#cbd5e1' },
-  cursor: { fill: 'rgb(255 255 255 / 0.04)' },
+const COLORS = {
+  steel: '#ABABA9',
+  profit: '#3DD68C',
+  deduction: '#E5484D',
+  amber: '#F2B134',
+  paper: '#F2EDE0',
+  muted: '#777D78',
+  grid: '#2A2F2B',
+  panel: '#151816',
 };
 
-function Kpi({ label, icon, tone, value, format, delay }) {
+const COST_COLORS = {
+  'Food cost': '#D4A85C',
+  Commission: '#E5484D',
+  'GST on commission': '#F2B134',
+  Discounts: '#B76B79',
+  Packaging: '#7E9FBA',
+  Profit: '#3DD68C',
+};
+
+const axisProps = {
+  stroke: COLORS.muted,
+  tick: { fill: COLORS.muted, fontSize: 10, fontFamily: 'JetBrains Mono' },
+  tickLine: false,
+  axisLine: false,
+};
+
+const tooltipProps = {
+  contentStyle: {
+    background: '#1A1C1B',
+    border: '1px solid #3A403B',
+    borderRadius: 6,
+    color: '#F1F1EE',
+    fontSize: 12,
+    fontFamily: 'JetBrains Mono',
+  },
+  labelStyle: { color: '#F1F1EE', marginBottom: 4 },
+  itemStyle: { color: '#F1F1EE' },
+  cursor: { fill: 'rgba(255,255,255,0.035)' },
+};
+
+function localDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function money(value) {
+  return formatINR(Number(value) || 0);
+}
+
+function Panel({ children, className = '' }) {
   return (
-    <Card hover delay={delay} className="group relative overflow-hidden p-5">
-      <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full blur-2xl opacity-40 transition duration-500 group-hover:opacity-70 ${tone.glow}`} />
-      <div className="relative flex items-start justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-        <span className={`rounded-xl p-2 ${tone.icon}`}><Icon name={icon} className="w-4 h-4" /></span>
+    <section className={`min-w-0 rounded-md border border-hairline bg-panel ${className}`}>
+      {children}
+    </section>
+  );
+}
+
+function SectionHeading({ title, subtitle, action }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold tracking-tight text-on-steel">{title}</h2>
+        {subtitle && <p className="mt-1 text-xs text-on-steel-muted">{subtitle}</p>}
       </div>
-      <p className={`relative mt-3 text-3xl font-bold tracking-tight ${tone.text}`}>
-        <AnimatedNumber value={value} format={format} />
+      {action}
+    </div>
+  );
+}
+
+function Kpi({ label, value, note, tone = 'normal', icon }) {
+  const valueColor = {
+    normal: 'text-on-steel',
+    profit: 'text-profit',
+    deduction: 'text-deduction',
+    amber: 'text-amber',
+  }[tone];
+
+  return (
+    <Panel className="p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium text-on-steel-muted">{label}</p>
+        {icon && (
+          <span className="rounded-sm border border-hairline bg-panel-elevated p-2 text-on-steel-muted">
+            <Icon name={icon} className="h-4 w-4" />
+          </span>
+        )}
+      </div>
+      <p className={`mt-3 break-words font-mono text-xl font-bold tracking-tight tabular-nums sm:text-2xl ${valueColor}`}>
+        {value}
       </p>
-    </Card>
+      {note && <p className="mt-2 text-[11px] leading-relaxed text-on-steel-muted">{note}</p>}
+    </Panel>
+  );
+}
+
+function DateRangeButton({ active, children, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'rounded-sm border px-3 py-2 text-xs font-medium transition-colors',
+        active
+          ? 'border-hairline bg-panel-elevated text-on-steel'
+          : 'border-transparent text-on-steel-muted hover:text-on-steel',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ChartEmpty({ children = 'No data available for this selection.' }) {
+  return (
+    <div className="flex h-full min-h-40 items-center justify-center text-center text-xs text-on-steel-muted">
+      {children}
+    </div>
+  );
+}
+
+function MarginLabel({ value }) {
+  const tone = value < 10 ? 'text-deduction' : value < 20 ? 'text-amber' : 'text-profit';
+  return (
+    <span className={`font-mono text-xs tabular-nums ${tone}`}>
+      {Number(value || 0).toFixed(1)}%
+    </span>
+  );
+}
+
+function DishRanking({ dishes, direction = 'best' }) {
+  const sorted = [...dishes].sort((a, b) =>
+    direction === 'best' ? b.profit - a.profit : a.profit - b.profit
+  );
+  const visible = sorted.slice(0, 4);
+
+  if (!visible.length) {
+    return <ChartEmpty>No dish performance data yet.</ChartEmpty>;
+  }
+
+  return (
+    <div className="divide-y divide-hairline">
+      {visible.map((dish, index) => (
+        <div
+          key={`${dish.dish_name}-${index}`}
+          className="flex items-center justify-between gap-3 py-3"
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-on-steel">{dish.dish_name}</p>
+            <p className="mt-1 font-mono text-[10px] text-on-steel-muted">
+              {dish.orders} orders · {money(dish.revenue)} revenue
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className={`font-mono text-sm font-semibold tabular-nums ${dish.profit >= 0 ? 'text-profit' : 'text-deduction'}`}>
+              {dish.profit < 0 ? '−' : '+'}{money(Math.abs(dish.profit))}
+            </p>
+            <MarginLabel value={dish.marginPct} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
 export default function Dashboard() {
   const user = getUser();
   const navigate = useNavigate();
+
   const [outlets, setOutlets] = useState(null);
   const [platforms, setPlatforms] = useState([]);
-  const [outletIds, setOutletIds] = useState([]); // one or several outlets, analysed together
+  const [outletIds, setOutletIds] = useState([]);
   const [platformId, setPlatformId] = useState('');
   const [dishes, setDishes] = useState([]);
   const [dishId, setDishId] = useState('');
@@ -45,63 +206,122 @@ export default function Dashboard() {
   const [dateTo, setDateTo] = useState('');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadFilters() {
       try {
-        const [outletsRes, platformsRes] = await Promise.all([api.get('/outlets'), api.get('/platforms')]);
+        const [outletsRes, platformsRes] = await Promise.all([
+          api.get('/outlets'),
+          api.get('/platforms'),
+        ]);
+
+        if (cancelled) return;
+
         setOutlets(outletsRes.data);
         setPlatforms(platformsRes.data);
-        setOutletIds(outletsRes.data.slice(0, 10).map((o) => o.id)); // start with all outlets (up to 10)
+        setOutletIds(outletsRes.data.slice(0, 10).map((outlet) => outlet.id));
       } catch {
-        setError('Failed to load filters');
+        if (!cancelled) setError('Failed to load dashboard filters.');
       }
     }
+
     loadFilters();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const outletKey = outletIds.join(',');
   const multi = outletIds.length > 1;
-  const outletName = (id) => (outlets || []).find((o) => o.id === id)?.name || '';
 
-  // Dish filter options follow the selected outlets (names carry their outlet when several are selected)
-  useEffect(() => {
-    if (!outlets || outletIds.length === 0) return;
-    let cancelled = false;
-    Promise.all(outletIds.map((id) => api.get(`/dishes/outlet/${id}`).then((res) =>
-      res.data.map((d) => ({ ...d, label: outletIds.length > 1 ? `${d.name} (${outletName(id)})` : d.name })))))
-      .then((lists) => { if (!cancelled) setDishes(lists.flat()); })
-      .catch(() => { if (!cancelled) setDishes([]); });
-    return () => { cancelled = true; };
-  }, [outletKey, outlets]);
+  const outletNames = useMemo(
+    () => new Map((outlets || []).map((outlet) => [outlet.id, outlet.name])),
+    [outlets]
+  );
+
+  // Hide stale dashboard data when no outlets are selected.
+  const visibleData = outletIds.length > 0 ? data : null;
 
   useEffect(() => {
-    if (outletIds.length === 0) return;
+    if (!outlets || !outletKey) return;
+
     let cancelled = false;
+
+    Promise.all(
+      outletIds.map((id) =>
+        api.get(`/dishes/outlet/${id}`).then((res) =>
+          res.data.map((dish) => ({
+            ...dish,
+            label: multi
+              ? `${dish.name} (${outletNames.get(id) || ''})`
+              : dish.name,
+          }))
+        )
+      )
+    )
+      .then((lists) => {
+        if (!cancelled) setDishes(lists.flat());
+      })
+      .catch(() => {
+        if (!cancelled) setDishes([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [outletKey, outletIds, outlets, multi, outletNames]);
+
+  useEffect(() => {
+    if (!outletKey) return;
+
+    let cancelled = false;
+
     async function loadMargins() {
+      setLoading(true);
+
       try {
         const params = { outlet_ids: outletKey };
+
         if (platformId) params.platform_id = platformId;
         if (dishId) params.dish_id = dishId;
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
+
         const res = await api.get('/dashboard/margins', { params });
-        if (!cancelled) { setData(res.data); setError(''); }
+
+        if (!cancelled) {
+          setData(res.data);
+          setError('');
+        }
       } catch (err) {
-        if (!cancelled) setError(err.response?.data?.error || 'Failed to load dashboard data');
+        if (!cancelled) {
+          setError(err.response?.data?.error || 'Failed to load dashboard data.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
-    loadMargins();
-    return () => { cancelled = true; };
-  }, [outletKey, platformId, dishId, dateFrom, dateTo]);
 
-  const hasFilters = platformId || dishId || dateFrom || dateTo;
+    loadMargins();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [outletKey, outletIds.length, platformId, dishId, dateFrom, dateTo]);
+
+  const hasFilters = Boolean(platformId || dishId || dateFrom || dateTo);
+
   const filters = {
     platform_id: platformId || undefined,
     dish_id: dishId || undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
   };
+
   function clearFilters() {
     setPlatformId('');
     setDishId('');
@@ -109,256 +329,743 @@ export default function Dashboard() {
     setDateTo('');
   }
 
-  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  function setQuickRange(days) {
+    if (days === 'all') {
+      setDateFrom('');
+      setDateTo('');
+      return;
+    }
+
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - (days - 1));
+
+    setDateFrom(localDate(from));
+    setDateTo(localDate(today));
+  }
+
+  const today = new Date();
+  const greeting =
+    today.getHours() < 12
+      ? 'Good morning'
+      : today.getHours() < 17
+        ? 'Good afternoon'
+        : 'Good evening';
+
+  const firstName = user.name?.trim().split(/\s+/)[0] || 'there';
 
   if (outlets && outlets.length === 0) {
     return (
-      <>
-        <PageHeader title={`${greeting}, ${user.name?.split(' ')[0]}`} subtitle="Your profit dashboard" />
+      <div className="space-y-6">
+        <div className="border-b border-hairline pb-5">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-on-steel-muted">
+            Overview / Dashboard
+          </p>
+          <h1 className="mt-2 font-display text-3xl text-on-steel">
+            {greeting}, {firstName}.
+          </h1>
+          <p className="mt-2 text-sm text-on-steel-muted">Your financial overview.</p>
+        </div>
+
         <EmptyState icon="store" title="No outlets yet">
           Add your first outlet, then its dishes and orders, and your margins will show up here.
-          <span className="mt-4 block"><Button icon="plus" onClick={() => navigate('/outlets')}>Add an outlet</Button></span>
+          <span className="mt-4 block">
+            <Button icon="plus" onClick={() => navigate('/outlets')}>
+              Add an outlet
+            </Button>
+          </span>
         </EmptyState>
-      </>
+      </div>
     );
   }
 
+  const kpis = visibleData?.kpis || {};
+  const dishBreakdown = visibleData?.dishBreakdown || [];
+  const platformBreakdown = visibleData?.platformBreakdown || [];
+  const outletBreakdown = visibleData?.outletBreakdown || [];
+  const trend = visibleData?.trend || [];
+  const costBreakdown = visibleData?.costBreakdown || [];
+
+  const lossDishes = dishBreakdown.filter((dish) => dish.profit < 0);
+  const lowMarginDishes = dishBreakdown.filter(
+    (dish) => dish.profit >= 0 && dish.marginPct < 10
+  );
+
+  const totalRevenue = Number(kpis.totalRevenue || 0);
+  const costParts = costBreakdown.filter((item) => item.amount > 0);
+
+  const platformTotal = platformBreakdown.reduce(
+    (sum, platform) => sum + Number(platform.revenue || 0),
+    0
+  );
+
   return (
-    <>
-      <PageHeader title={`${greeting}, ${user.name?.split(' ')[0]}`} subtitle="Profit after commission, GST, discounts, packaging and food cost." />
+    <div className="space-y-6">
+      {/* Dashboard heading */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-5">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-on-steel-muted">
+            Overview / Dashboard
+          </p>
+          <h1 className="mt-2 font-display text-3xl tracking-tight text-on-steel sm:text-4xl">
+            {greeting}, {firstName}.
+          </h1>
+          <p className="mt-2 max-w-xl text-sm text-on-steel-muted">
+            Revenue is vanity. Profit after every deduction is what matters.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-sm border border-hairline bg-panel px-3 py-2">
+          <span className={`h-2 w-2 rounded-full ${loading ? 'bg-amber' : 'bg-profit'}`} />
+          <span className="font-mono text-[10px] uppercase tracking-wide text-on-steel-muted">
+            {loading ? 'Updating data' : 'Live dashboard'}
+          </span>
+        </div>
+      </div>
 
       {/* Filters */}
-      <Card className="relative z-10 mb-6 grid grid-cols-2 gap-4 p-5 md:grid-cols-3 xl:grid-cols-5">
-        <div>
-          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400">Outlets</span>
-          <OutletPicker outlets={outlets || []} selected={outletIds} onChange={(ids) => { setOutletIds(ids); setDishId(''); }} />
+      <Panel className="p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-on-steel">Report filters</p>
+            <p className="mt-1 text-xs text-on-steel-muted">
+              Select outlets, channels, dishes and reporting dates.
+            </p>
+          </div>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs font-medium text-profit hover:underline"
+            >
+              Clear all filters
+            </button>
+          )}
         </div>
-        <Field label="Platform">
-          <Select value={platformId} onChange={(e) => setPlatformId(e.target.value)}>
-            <option value="">All platforms</option>
-            {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Dish">
-          <Select value={dishId} onChange={(e) => setDishId(e.target.value)}>
-            <option value="">All dishes</option>
-            {dishes.map((d) => <option key={d.id} value={d.id}>{d.label || d.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="From">
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </Field>
-        <Field label="To">
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </Field>
-        {hasFilters && (
-          <button onClick={clearFilters} className="col-span-2 justify-self-start text-xs font-semibold text-emerald-300 hover:text-emerald-200 md:col-span-3 xl:col-span-5 animate-fade-in">
-            Clear filters
-          </button>
-        )}
-      </Card>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <Field label="Outlets">
+            <OutletPicker
+              outlets={outlets || []}
+              selected={outletIds}
+              onChange={(ids) => {
+                setOutletIds(ids);
+                setDishId('');
+              }}
+            />
+          </Field>
+
+          <Field label="Platform">
+            <Select value={platformId} onChange={(e) => setPlatformId(e.target.value)}>
+              <option value="">All platforms</option>
+              {platforms.map((platform) => (
+                <option key={platform.id} value={platform.id}>
+                  {platform.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Dish">
+            <Select value={dishId} onChange={(e) => setDishId(e.target.value)}>
+              <option value="">All dishes</option>
+              {dishes.map((dish) => (
+                <option key={dish.id} value={dish.id}>
+                  {dish.label || dish.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="From">
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+          </Field>
+
+          <Field label="To">
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-1 rounded-sm border border-hairline bg-stainless-bg p-1">
+          <span className="px-2 text-[10px] font-medium uppercase tracking-wider text-on-steel-muted">
+            Quick range
+          </span>
+          <DateRangeButton active={!dateFrom && !dateTo} onClick={() => setQuickRange('all')}>
+            All time
+          </DateRangeButton>
+          <DateRangeButton
+            active={dateFrom === localDate(today) && dateTo === localDate(today)}
+            onClick={() => setQuickRange(1)}
+          >
+            Today
+          </DateRangeButton>
+          <DateRangeButton
+            active={dateFrom === localDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6)) && dateTo === localDate(today)}
+            onClick={() => setQuickRange(7)}
+          >
+            7 days
+          </DateRangeButton>
+          <DateRangeButton
+            active={dateFrom === localDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)) && dateTo === localDate(today)}
+            onClick={() => setQuickRange(30)}
+          >
+            30 days
+          </DateRangeButton>
+        </div>
+      </Panel>
 
       <ErrorText>{error}</ErrorText>
 
-      {!data ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}
-          <Skeleton className="col-span-2 h-72" />
-          <Skeleton className="col-span-2 h-72" />
+      {!visibleData ? (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}
+          </div>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Skeleton className="h-80" />
+            <Skeleton className="h-80" />
+          </div>
         </div>
       ) : (
         <>
-          {/* KPI cards */}
-          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Kpi label="Total revenue" icon="wallet" value={data.kpis.totalRevenue} format={formatINR} delay={0}
-              tone={{ glow: 'bg-cyan-500', icon: 'bg-cyan-400/10 text-cyan-300', text: 'text-white' }} />
-            <Kpi label="Net profit" icon="trend" value={data.kpis.totalProfit} format={formatINR} delay={60}
-              tone={data.kpis.totalProfit >= 0
-                ? { glow: 'bg-emerald-500', icon: 'bg-emerald-400/10 text-emerald-300', text: 'text-emerald-300' }
-                : { glow: 'bg-rose-500', icon: 'bg-rose-400/10 text-rose-300', text: 'text-rose-300' }} />
-            <Kpi label="Margin" icon="percent" value={data.kpis.marginPct} format={(v) => `${v.toFixed(1)}%`} delay={120}
-              tone={{ glow: 'bg-violet-500', icon: 'bg-violet-400/10 text-violet-300', text: 'text-white' }} />
-            <Kpi label="Orders" icon="bag" value={data.kpis.orderCount} format={(v) => Math.round(v)} delay={180}
-              tone={{ glow: 'bg-amber-500', icon: 'bg-amber-400/10 text-amber-300', text: 'text-white' }} />
-          </div>
+          {/* KPI row */}
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-on-steel-muted">
+                Financial summary
+              </p>
+              <span className="font-mono text-[10px] text-on-steel-muted">
+                {outletIds.length} selected outlet{outletIds.length === 1 ? '' : 's'}
+              </span>
+            </div>
 
-          <AIInsights outletIds={outletIds} filters={filters} />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Kpi
+                label="Total revenue"
+                value={money(kpis.totalRevenue)}
+                note="Gross order value"
+                icon="wallet"
+              />
+              <Kpi
+                label="Net profit"
+                value={money(kpis.totalProfit)}
+                note="After all recorded costs and fees"
+                icon="trend"
+                tone={Number(kpis.totalProfit) >= 0 ? 'profit' : 'deduction'}
+              />
+              <Kpi
+                label="Profit margin"
+                value={`${Number(kpis.marginPct || 0).toFixed(1)}%`}
+                note="Net profit as a share of revenue"
+                icon="percent"
+                tone={Number(kpis.marginPct) < 10 ? 'amber' : 'profit'}
+              />
+              <Kpi
+                label="Total orders"
+                value={Number(kpis.orderCount || 0).toLocaleString('en-IN')}
+                note="Orders in the selected period"
+                icon="bag"
+              />
+            </div>
+          </section>
 
-          {/* Outlet comparison, shown when several outlets are selected */}
-          {multi && (
-            <Card delay={190} className="mb-6 p-5">
-              <h2 className="font-semibold text-white">Profit by outlet</h2>
-              <p className="mb-4 text-sm text-slate-400">Revenue vs what each outlet keeps, most profit first</p>
-              <ResponsiveContainer width="100%" height={Math.max(180, (data.outletBreakdown || []).length * 56)}>
-                <BarChart data={data.outletBreakdown || []} layout="vertical" margin={{ left: 10, right: 20 }}>
-                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" horizontal={false} />
-                  <XAxis type="number" tickFormatter={formatINR} {...axisProps} />
-                  <YAxis type="category" dataKey="outlet_name" width={170} interval={0} {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
-                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
-                  <Bar dataKey="revenue" name="Revenue" fill="#818cf8" fillOpacity={0.55} radius={[0, 6, 6, 0]} animationDuration={900} />
-                  <Bar dataKey="profit" name="Profit" fill="url(#profitBar)" radius={[0, 6, 6, 0]} animationDuration={900} />
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(data.outletBreakdown || []).map((o) => (
-                  <Badge key={o.outlet_id} tone={o.marginPct < 10 ? 'red' : o.marginPct < 30 ? 'amber' : 'green'}>
-                    {o.outlet_name}: {o.marginPct.toFixed(1)}% margin
-                  </Badge>
-                ))}
+          {/* Loss-making dish alert */}
+          {(lossDishes.length > 0 || lowMarginDishes.length > 0) && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber/40 bg-panel px-4 py-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="mt-0.5 shrink-0 text-amber">
+                  <Icon name="alert" className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-amber">
+                    {lossDishes.length > 0
+                      ? `${lossDishes.length} loss-making dish${lossDishes.length === 1 ? '' : 'es'} detected`
+                      : `${lowMarginDishes.length} dish${lowMarginDishes.length === 1 ? '' : 'es'} with low margins`}
+                  </p>
+                  <p className="mt-1 text-xs text-on-steel-muted">
+                    {lossDishes.length > 0
+                      ? `${lossDishes.slice(0, 2).map((dish) => dish.dish_name).join(', ')} ${lossDishes.length > 1 ? 'are' : 'is'} currently operating at a loss.`
+                      : `${lowMarginDishes.slice(0, 2).map((dish) => dish.dish_name).join(', ')} ${lowMarginDishes.length > 1 ? 'have' : 'has'} a margin below 10%.`}
+                  </p>
+                </div>
               </div>
-            </Card>
+              <button
+                type="button"
+                onClick={() => navigate('/outlets')}
+                className="shrink-0 font-mono text-xs text-amber hover:underline"
+              >
+                Review menu →
+              </button>
+            </div>
           )}
 
+          {/* AI insights */}
+          <AIInsights outletIds={outletIds} filters={filters} />
 
-          {/* Charts */}
-          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card delay={200} className="p-5">
-              <h2 className="mb-4 font-semibold text-white">Profit by dish</h2>
-              {/* Horizontal bars so full dish names fit on the axis */}
-              <ResponsiveContainer width="100%" height={Math.max(250, data.dishBreakdown.length * (multi ? 34 : 44))}>
-                <BarChart data={data.dishBreakdown} layout="vertical" margin={{ left: 10, right: 20 }}>
-                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" horizontal={false} />
-                  <XAxis type="number" tickFormatter={formatINR} {...axisProps} />
-                  <YAxis type="category" dataKey="dish_name" width={multi ? 220 : 130} interval={0} {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
-                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
-                  <Bar dataKey="profit" name="Profit" radius={[0, 8, 8, 0]} animationDuration={900}>
-                    {data.dishBreakdown.map((d) => (
-                      <Cell key={d.dish_name} fill={d.profit >= 0 ? 'url(#profitBar)' : 'url(#lossBar)'} />
-                    ))}
-                  </Bar>
-                  <defs>
-                    <linearGradient id="profitBar" x1="0" x2="1"><stop offset="0%" stopColor="#10b981" /><stop offset="100%" stopColor="#22d3ee" /></linearGradient>
-                    <linearGradient id="lossBar" x1="0" x2="1"><stop offset="0%" stopColor="#f43f5e" /><stop offset="100%" stopColor="#fb7185" /></linearGradient>
-                  </defs>
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-            <Card delay={260} className="p-5">
-              <h2 className="mb-4 font-semibold text-white">Profit trend</h2>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={data.trend} margin={{ right: 10 }}>
-                  <defs>
-                    <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#818cf8" stopOpacity={0.35} /><stop offset="100%" stopColor="#818cf8" stopOpacity={0} /></linearGradient>
-                    <linearGradient id="profitFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity={0.45} /><stop offset="100%" stopColor="#34d399" stopOpacity={0} /></linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" vertical={false} />
-                  <XAxis dataKey="date" {...axisProps} />
-                  <YAxis tickFormatter={formatINR} width={60} {...axisProps} />
-                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} cursor={{ stroke: 'rgb(255 255 255 / 0.2)' }} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
-                  <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#818cf8" strokeWidth={2} fill="url(#revFill)" animationDuration={1000} />
-                  <Area type="monotone" dataKey="profit" name="Profit" stroke="#34d399" strokeWidth={2.5} fill="url(#profitFill)" animationDuration={1000} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </Card>
-          </div>
+          {/* Trend and platform */}
+          <section className="grid grid-cols-1 gap-5 xl:grid-cols-12">
+            <Panel className="p-4 sm:p-6 xl:col-span-8">
+              <SectionHeading
+                title="Revenue & net profit trend"
+                subtitle="Gross order value against net kitchen profit"
+              />
 
-          {/* Platform-wise and cost-wise analytics */}
-          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card delay={300} className="p-5">
-              <h2 className="font-semibold text-white">Profit by platform</h2>
-              <p className="mb-4 text-sm text-slate-400">Revenue vs what you keep, best margin first</p>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={data.platformBreakdown} margin={{ right: 10 }}>
-                  <CartesianGrid stroke="rgb(255 255 255 / 0.06)" vertical={false} />
-                  <XAxis dataKey="platform_name" {...axisProps} tick={{ fill: '#cbd5e1', fontSize: 12 }} />
-                  <YAxis tickFormatter={formatINR} width={60} {...axisProps} />
-                  <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
-                  <Bar dataKey="revenue" name="Revenue" fill="#818cf8" fillOpacity={0.55} radius={[6, 6, 0, 0]} animationDuration={900} />
-                  <Bar dataKey="profit" name="Profit" fill="url(#profitBar)" radius={[6, 6, 0, 0]} animationDuration={900} />
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {data.platformBreakdown.map((p) => (
-                  <Badge key={p.platform_name} tone={p.marginPct < 10 ? 'red' : p.marginPct < 30 ? 'amber' : 'green'}>
-                    {p.platform_name}: {p.marginPct.toFixed(1)}% margin
-                  </Badge>
-                ))}
-              </div>
-            </Card>
-            <Card delay={340} className="p-5">
-              <h2 className="font-semibold text-white">Where the money goes</h2>
-              <p className="mb-4 text-sm text-slate-400">Share of revenue taken by each cost</p>
-              {(() => {
-                const revenue = data.kpis.totalRevenue;
-                const parts = data.costBreakdown.filter((c) => c.amount > 0);
-                const colors = { 'Food cost': '#a78bfa', Commission: '#fbbf24', 'GST on commission': '#fcd34d', Discounts: '#fb7185', Packaging: '#22d3ee', Profit: '#34d399' };
-                return revenue > 0 ? (
-                  <div className="grid items-center gap-4 sm:grid-cols-2">
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie data={parts} dataKey="amount" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2} stroke="none" animationDuration={900}>
-                          {parts.map((c) => <Cell key={c.name} fill={colors[c.name]} />)}
-                        </Pie>
-                        <Tooltip formatter={(v) => formatINR(v)} {...tooltipProps} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <ul className="space-y-2 text-sm">
-                      {data.costBreakdown.map((c) => (
-                        <li key={c.name} className="flex items-center justify-between gap-3">
-                          <span className="flex items-center gap-2 text-slate-300">
-                            <span className="h-2.5 w-2.5 rounded-full" style={{ background: colors[c.name] }} />{c.name}
+              {trend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="dashboardRevenueFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={COLORS.steel} stopOpacity={0.18} />
+                        <stop offset="100%" stopColor={COLORS.steel} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="dashboardProfitFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={COLORS.profit} stopOpacity={0.24} />
+                        <stop offset="100%" stopColor={COLORS.profit} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke={COLORS.grid} strokeDasharray="3 4" vertical={false} />
+                    <XAxis dataKey="date" {...axisProps} tickMargin={10} />
+                    <YAxis
+                      {...axisProps}
+                      width={65}
+                      tickFormatter={(value) => {
+                        const amount = Number(value) || 0;
+                        return amount >= 1000
+                          ? `₹${(amount / 1000).toFixed(0)}k`
+                          : `₹${amount}`;
+                      }}
+                    />
+                    <Tooltip
+                      {...tooltipProps}
+                      formatter={(value) => money(value)}
+                    />
+                    <Legend
+                      wrapperStyle={{
+                        color: COLORS.steel,
+                        fontSize: 11,
+                        paddingTop: 12,
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      name="Revenue"
+                      stroke={COLORS.steel}
+                      strokeWidth={2}
+                      fill="url(#dashboardRevenueFill)"
+                      activeDot={{ r: 4, fill: COLORS.steel }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="profit"
+                      name="Net profit"
+                      stroke={COLORS.profit}
+                      strokeWidth={2.5}
+                      fill="url(#dashboardProfitFill)"
+                      activeDot={{ r: 4, fill: COLORS.profit }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartEmpty>No order history for the selected dates.</ChartEmpty>
+              )}
+            </Panel>
+
+            <Panel className="p-4 sm:p-6 xl:col-span-4">
+              <SectionHeading
+                title="Revenue by platform"
+                subtitle="Channel share and effective margin"
+              />
+
+              {platformBreakdown.length > 0 ? (
+                <div className="space-y-5">
+                  {platformBreakdown.map((platform) => {
+                    const share = platformTotal > 0
+                      ? (Number(platform.revenue || 0) / platformTotal) * 100
+                      : 0;
+
+                    return (
+                      <div key={platform.platform_name}>
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium text-on-steel">
+                            {platform.platform_name}
                           </span>
-                          <span className={`font-semibold ${c.name === 'Profit' ? (c.amount >= 0 ? 'text-emerald-300' : 'text-rose-300') : 'text-slate-100'}`}>
-                            {formatINR(c.amount)} <span className="font-normal text-slate-500">{((c.amount / revenue) * 100).toFixed(1)}%</span>
+                          <span className="font-mono text-xs tabular-nums text-on-steel">
+                            {money(platform.revenue)}
                           </span>
-                        </li>
+                        </div>
+
+                        <div className="h-2 overflow-hidden rounded-sm bg-stainless-bg">
+                          <div
+                            className="h-full rounded-sm bg-profit transition-all"
+                            style={{ width: `${Math.min(100, share)}%` }}
+                          />
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="font-mono text-[10px] text-on-steel-muted">
+                            {share.toFixed(1)}% of revenue
+                          </span>
+                          <MarginLabel value={platform.marginPct} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <ChartEmpty>No platform data available.</ChartEmpty>
+              )}
+            </Panel>
+          </section>
+
+          {/* Dish rankings */}
+          <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <Panel className="p-4 sm:p-6">
+              <SectionHeading
+                title="Most profitable dishes"
+                subtitle="Highest total profit in the selected period"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => navigate('/outlets')}
+                    className="font-mono text-[10px] text-profit hover:underline"
+                  >
+                    View menu →
+                  </button>
+                }
+              />
+              <DishRanking dishes={dishBreakdown} direction="best" />
+            </Panel>
+
+            <Panel className="p-4 sm:p-6">
+              <SectionHeading
+                title="Least profitable dishes"
+                subtitle="Lowest total profit in the selected period"
+                action={
+                  lossDishes.length > 0 ? (
+                    <span className="rounded-sm bg-deduction/10 px-2 py-1 font-mono text-[10px] text-deduction">
+                      Action needed
+                    </span>
+                  ) : null
+                }
+              />
+              <DishRanking dishes={dishBreakdown} direction="worst" />
+            </Panel>
+          </section>
+
+          {/* Outlet comparison and profit by dish */}
+          <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            {multi && (
+              <Panel className="p-4 sm:p-6">
+                <SectionHeading
+                  title="Outlet performance"
+                  subtitle="Revenue, net profit and margin by location"
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => navigate('/outlets')}
+                      className="font-mono text-[10px] text-profit hover:underline"
+                    >
+                      Manage →
+                    </button>
+                  }
+                />
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[430px] text-left">
+                    <thead>
+                      <tr className="border-b border-hairline font-mono text-[10px] uppercase tracking-wide text-on-steel-muted">
+                        <th className="pb-3 font-medium">Outlet</th>
+                        <th className="pb-3 text-right font-medium">Revenue</th>
+                        <th className="pb-3 text-right font-medium">Profit</th>
+                        <th className="pb-3 text-right font-medium">Margin</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-hairline">
+                      {outletBreakdown.map((outlet) => (
+                        <tr key={outlet.outlet_id}>
+                          <td className="py-3 pr-2 text-xs font-medium text-on-steel">
+                            {outlet.outlet_name}
+                          </td>
+                          <td className="py-3 text-right font-mono text-[11px] tabular-nums text-on-steel">
+                            {money(outlet.revenue)}
+                          </td>
+                          <td className={`py-3 text-right font-mono text-[11px] tabular-nums ${outlet.profit >= 0 ? 'text-profit' : 'text-deduction'}`}>
+                            {money(outlet.profit)}
+                          </td>
+                          <td className="py-3 text-right">
+                            <MarginLabel value={outlet.marginPct} />
+                          </td>
+                        </tr>
                       ))}
-                    </ul>
-                  </div>
-                ) : <p className="py-10 text-center text-slate-400">No orders in this range yet.</p>;
-              })()}
-            </Card>
-          </div>
+                      {outletBreakdown.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-xs text-on-steel-muted">
+                            No outlet comparison data.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+            )}
 
-          {/* AI Assistant */}
-          <div className="mb-6">
-            <AIChat outletIds={outletIds} filters={filters} />
-          </div>
+            <Panel className={`p-4 sm:p-6 ${multi ? '' : 'xl:col-span-2'}`}>
+              <SectionHeading
+                title="Profit by dish"
+                subtitle="Total net profit after all recorded deductions"
+              />
 
-          {/* Dish table, worst margin first */}
-          <Card delay={320} className="overflow-hidden">
-            <div className="border-b border-white/10 p-5">
-              <h2 className="font-semibold text-white">Dishes ranked by margin</h2>
-              <p className="text-sm text-slate-400">Worst performers first</p>
+              {dishBreakdown.length > 0 ? (
+                <ResponsiveContainer
+                  width="100%"
+                  height={Math.max(230, Math.min(dishBreakdown.length, 9) * 38)}
+                >
+                  <BarChart
+                    data={dishBreakdown.slice(0, 9)}
+                    layout="vertical"
+                    margin={{ left: 4, right: 18, top: 4, bottom: 4 }}
+                  >
+                    <CartesianGrid stroke={COLORS.grid} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      {...axisProps}
+                      tickFormatter={(value) => {
+                        const amount = Number(value) || 0;
+                        return amount >= 1000
+                          ? `₹${(amount / 1000).toFixed(0)}k`
+                          : `₹${amount}`;
+                      }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="dish_name"
+                      width={125}
+                      interval={0}
+                      {...axisProps}
+                      tick={{ fill: COLORS.steel, fontSize: 10 }}
+                    />
+                    <Tooltip
+                      {...tooltipProps}
+                      formatter={(value) => money(value)}
+                    />
+                    <Bar dataKey="profit" name="Net profit" radius={[0, 3, 3, 0]}>
+                      {dishBreakdown.slice(0, 9).map((dish, index) => (
+                        <Cell
+                          key={`${dish.dish_name}-${index}`}
+                          fill={dish.profit >= 0 ? COLORS.profit : COLORS.deduction}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartEmpty>No dish profit data available.</ChartEmpty>
+              )}
+            </Panel>
+          </section>
+
+          {/* Cost breakdown receipt */}
+          <Panel className="overflow-hidden">
+            <div className="border-b border-hairline p-4 sm:p-6">
+              <SectionHeading
+                title="Where the money goes"
+                subtitle="A breakdown of revenue after costs, commissions and deductions"
+              />
             </div>
+
+            {totalRevenue > 0 && costParts.length > 0 ? (
+              <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-2">
+                <div className="flex min-w-0 items-center justify-center">
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                      <Pie
+                        data={costParts}
+                        dataKey="amount"
+                        nameKey="name"
+                        innerRadius={66}
+                        outerRadius={102}
+                        paddingAngle={2}
+                        stroke="none"
+                      >
+                        {costParts.map((item) => (
+                          <Cell
+                            key={item.name}
+                            fill={COST_COLORS[item.name] || COLORS.steel}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        {...tooltipProps}
+                        formatter={(value) => money(value)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="receipt-paper receipt-edge mx-auto w-full max-w-lg p-5 sm:p-7">
+                  <div className="text-center">
+                    <p className="font-mono text-[10px] font-bold tracking-[0.2em] text-ink-muted">
+                      KITCHEN MARGIN TRACKER
+                    </p>
+                    <h3 className="mt-2 font-display text-2xl text-ink">
+                      Financial receipt
+                    </h3>
+                    <p className="mt-1 font-mono text-[10px] text-ink-muted">
+                      {dateFrom || 'All time'} — {dateTo || 'Present'}
+                    </p>
+                  </div>
+
+                  <hr className="receipt-divider my-5" />
+
+                  <div className="flex items-center justify-between gap-3 font-mono text-xs font-bold text-ink">
+                    <span>GROSS REVENUE</span>
+                    <span className="tabular-nums">{money(totalRevenue)}</span>
+                  </div>
+
+                  <hr className="receipt-divider my-4" />
+
+                  <div className="space-y-3">
+                    {costBreakdown.map((item) => {
+                      const isProfit = item.name === 'Profit';
+                      const amount = Number(item.amount || 0);
+                      const percentage = totalRevenue > 0
+                        ? (amount / totalRevenue) * 100
+                        : 0;
+
+                      return (
+                        <div
+                          key={item.name}
+                          className="flex items-start justify-between gap-4 font-mono text-xs"
+                        >
+                          <div className="flex min-w-0 items-center gap-2 text-ink">
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{
+                                background: COST_COLORS[item.name] || COLORS.steel,
+                              }}
+                            />
+                            <span className="truncate">{item.name}</span>
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            <p className={`tabular-nums ${isProfit ? amount >= 0 ? 'font-bold text-profit-ink' : 'font-bold text-deduction-ink' : 'text-ink'}`}>
+                              {money(amount)}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-ink-muted">
+                              {percentage.toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <hr className="receipt-divider my-4" />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-mono text-xs font-bold text-ink">
+                      NET PROFIT
+                    </span>
+                    <span className={`font-mono text-lg font-bold tabular-nums ${Number(kpis.totalProfit) >= 0 ? 'text-profit-ink' : 'text-deduction-ink'}`}>
+                      {money(kpis.totalProfit)}
+                    </span>
+                  </div>
+
+                  <p className="mt-5 text-center font-mono text-[9px] tracking-wide text-ink-muted">
+                    EVERY RUPEE ACCOUNTED FOR
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-10 text-center text-xs text-on-steel-muted">
+                No revenue or cost data in the selected period.
+              </div>
+            )}
+          </Panel>
+
+          {/* AI assistant */}
+          <section>
+            <div className="mb-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-on-steel-muted">
+                Ask your data
+              </p>
+              <h2 className="mt-1 font-display text-2xl text-on-steel">
+                The numbers can answer back.
+              </h2>
+            </div>
+            <AIChat outletIds={outletIds} filters={filters} />
+          </section>
+
+          {/* Full dish table */}
+          <Panel className="overflow-hidden">
+            <div className="border-b border-hairline p-4 sm:p-6">
+              <SectionHeading
+                title="Dish performance register"
+                subtitle="All dishes ranked by profit margin, lowest first"
+              />
+            </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-xs uppercase tracking-wider text-slate-400">
-                  <tr className="border-b border-white/5">
-                    <th className="px-5 py-3 text-left font-semibold">Dish</th>
-                    <th className="px-5 py-3 text-right font-semibold">Orders</th>
-                    <th className="px-5 py-3 text-right font-semibold">Revenue</th>
-                    <th className="px-5 py-3 text-right font-semibold">Profit</th>
-                    <th className="px-5 py-3 text-right font-semibold">Margin</th>
+              <table className="w-full min-w-[620px] text-sm">
+                <thead>
+                  <tr className="border-b border-hairline font-mono text-[10px] uppercase tracking-wide text-on-steel-muted">
+                    <th className="px-5 py-3 text-left font-medium">Dish</th>
+                    <th className="px-5 py-3 text-right font-medium">Orders</th>
+                    <th className="px-5 py-3 text-right font-medium">Revenue</th>
+                    <th className="px-5 py-3 text-right font-medium">Profit</th>
+                    <th className="px-5 py-3 text-right font-medium">Margin</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {data.dishBreakdown.map((d, i) => (
-                    <tr key={d.dish_name} style={{ animationDelay: `${i * 50}ms` }}
-                      className="border-b border-white/5 transition hover:bg-white/[0.04] animate-fade-up">
-                      <td className="px-5 py-3.5 font-medium text-slate-100">{d.dish_name}</td>
-                      <td className="px-5 py-3.5 text-right text-slate-300">{d.orders}</td>
-                      <td className="px-5 py-3.5 text-right text-slate-300">{formatINR(d.revenue)}</td>
-                      <td className={`px-5 py-3.5 text-right font-semibold ${d.profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                        {formatINR(d.profit)}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <Badge tone={d.marginPct < 10 ? 'red' : d.marginPct < 20 ? 'amber' : 'green'}>{d.marginPct.toFixed(1)}%</Badge>
+
+                <tbody className="divide-y divide-hairline">
+                  {[...dishBreakdown]
+                    .sort((a, b) => a.marginPct - b.marginPct)
+                    .map((dish, index) => (
+                      <tr
+                        key={`${dish.dish_name}-${index}`}
+                        className="transition-colors hover:bg-panel-elevated"
+                      >
+                        <td className="px-5 py-3.5 font-medium text-on-steel">
+                          {dish.dish_name}
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-mono text-xs tabular-nums text-on-steel-muted">
+                          {dish.orders}
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-mono text-xs tabular-nums text-on-steel">
+                          {money(dish.revenue)}
+                        </td>
+                        <td className={`px-5 py-3.5 text-right font-mono text-xs font-semibold tabular-nums ${dish.profit >= 0 ? 'text-profit' : 'text-deduction'}`}>
+                          {money(dish.profit)}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <MarginLabel value={dish.marginPct} />
+                        </td>
+                      </tr>
+                    ))}
+
+                  {dishBreakdown.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-10 text-center text-xs text-on-steel-muted">
+                        No dish data in the selected period.
                       </td>
                     </tr>
-                  ))}
-                  {data.dishBreakdown.length === 0 && (
-                    <tr><td colSpan="5" className="py-10 text-center text-slate-400">No orders in this range yet.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </Card>
+          </Panel>
         </>
       )}
-    </>
+    </div>
   );
 }

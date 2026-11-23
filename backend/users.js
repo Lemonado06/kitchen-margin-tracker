@@ -6,6 +6,7 @@ const router = express.Router();
 const { User } = require('./models');
 const { requireAuth, requireRole } = require('./middleware');
 const { validId } = require('./access');
+const { recordActivity } = require('./audit');
 
 module.exports = () => {
 
@@ -64,6 +65,9 @@ module.exports = () => {
         });
       }
 
+      const nameChanged = user.name !== name;
+      const passwordChanged = Boolean(new_password);
+
       if (new_password) {
         if (new_password.length < 6) {
           return res.status(400).json({
@@ -89,6 +93,24 @@ module.exports = () => {
       user.name = name;
 
       await user.save();
+
+      if (nameChanged || passwordChanged) {
+        const changes = [];
+
+        if (nameChanged) changes.push('name');
+        if (passwordChanged) changes.push('password');
+
+        await recordActivity({
+          accountId: req.user.accountId,
+          userId: req.user.id,
+          userName: req.user.name,
+          userRole: req.user.role,
+          action: 'UPDATE',
+          module: 'PROFILE',
+          description: `Updated profile (${changes.join(' and ')})`,
+          entityId: user.id,
+        });
+      }
 
       res.json(safeUser(user));
 
@@ -162,6 +184,17 @@ module.exports = () => {
         owner_id: req.user.id
       });
 
+      await recordActivity({
+        accountId: req.user.accountId,
+        userId: req.user.id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        action: 'CREATE',
+        module: 'TEAM',
+        description: `Added ${role}: ${name}`,
+        entityId: member.id,
+      });
+
       res.status(201).json(safeUser(member));
 
     } catch (err) {
@@ -208,6 +241,14 @@ module.exports = () => {
         });
       }
 
+      const changes = [];
+
+      if (member.name !== name) changes.push('name changed');
+      if (password) changes.push('password reset');
+      if (role && member.role !== role) {
+        changes.push(`role changed to ${role}`);
+      }
+
       member.name = name;
 
       if (password) {
@@ -219,6 +260,19 @@ module.exports = () => {
       }
 
       await member.save();
+
+      if (changes.length > 0) {
+        await recordActivity({
+          accountId: req.user.accountId,
+          userId: req.user.id,
+          userName: req.user.name,
+          userRole: req.user.role,
+          action: 'UPDATE',
+          module: 'TEAM',
+          description: `Updated ${member.name}: ${changes.join(', ')}`,
+          entityId: member.id,
+        });
+      }
 
       res.json(safeUser(member));
 
@@ -243,6 +297,17 @@ module.exports = () => {
           error: 'Team member not found'
         });
       }
+
+      await recordActivity({
+        accountId: req.user.accountId,
+        userId: req.user.id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        action: 'DELETE',
+        module: 'TEAM',
+        description: `Removed team member: ${member.name}`,
+        entityId: member.id,
+      });
 
       res.json({ deleted: true });
 

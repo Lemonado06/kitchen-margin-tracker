@@ -1,39 +1,126 @@
+
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { canViewProfit, getUser, logout } from '../api/client';
 import Icon from './Icon';
-import { RoleBadge } from './ui';
-import { canViewProfit, getUser, isOwner, logout } from '../api/client';
 
-// Animated gradient blobs behind the glass panels
-export function Backdrop() {
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-slate-950">
-      <div className="absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-emerald-500/25 blur-3xl animate-blob" />
-      <div className="absolute -right-24 top-1/4 h-[26rem] w-[26rem] rounded-full bg-cyan-500/20 blur-3xl animate-blob [animation-delay:-6s]" />
-      <div className="absolute bottom-[-10rem] left-1/3 h-[30rem] w-[30rem] rounded-full bg-indigo-600/25 blur-3xl animate-blob [animation-delay:-12s]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_0%,rgb(2_6_23/0.6)_70%)]" />
-    </div>
-  );
-}
+const GREEN = '#34D399';
 
-function NavItem({ to, icon, label, onClick }) {
+const navigation = [
+  {
+    label: 'Dashboard',
+    path: '/dashboard',
+    icon: 'dashboard',
+    visible: (user) => canViewProfit(user),
+  },
+  {
+    label: 'Outlets',
+    path: '/outlets',
+    icon: 'store',
+    visible: () => true,
+  },
+  {
+    label: 'Team',
+    path: '/team',
+    icon: 'users',
+    visible: (user) => user?.role === 'owner',
+  },
+  {
+    label: 'Activity',
+    path: '/activity',
+    icon: 'activity',
+    visible: (user) => user?.role === 'owner',
+  },
+  {
+    label: 'Profile',
+    path: '/profile',
+    icon: 'user',
+    visible: () => true,
+  },
+];
+
+const roleLabels = {
+  owner: 'OWNER',
+  manager: 'MANAGER',
+  staff: 'KITCHEN STAFF',
+};
+
+function NavItem({ item, onNavigate }) {
   return (
     <NavLink
-      to={to}
-      onClick={onClick}
+      to={item.path}
+      end
+      onClick={onNavigate}
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition duration-200 ${isActive ? 'bg-white/10 text-white shadow-inner shadow-white/5' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
-        }`
+        [
+          'group relative flex min-h-11 items-center gap-3 rounded-lg px-3.5 py-2.5',
+          'text-[13px] font-medium transition-all duration-150',
+          isActive
+            ? 'bg-[#1D2923] text-[#F1F1EE]'
+            : 'text-[#929891] hover:bg-[#1A201C] hover:text-[#F1F1EE]',
+        ].join(' ')
       }
     >
       {({ isActive }) => (
         <>
-          <span className={`absolute left-0 h-6 w-1 rounded-r-full bg-gradient-to-b from-emerald-400 to-cyan-400 transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-0 -translate-x-1'}`} />
-          <Icon name={icon} className={`w-5 h-5 transition duration-200 group-hover:scale-110 ${isActive ? 'text-emerald-300' : ''}`} />
-          {label}
+          {isActive && (
+            <span
+              className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full"
+              style={{ backgroundColor: GREEN }}
+            />
+          )}
+
+          <Icon
+            name={item.icon}
+            className={[
+              'h-[17px] w-[17px] shrink-0 transition-colors',
+              isActive
+                ? 'text-[#34D399]'
+                : 'text-[#777F78] group-hover:text-[#D6D9D4]',
+            ].join(' ')}
+          />
+
+          <span>{item.label}</span>
+
+          {isActive && (
+            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#34D399]" />
+          )}
         </>
       )}
     </NavLink>
+  );
+}
+
+function Brand({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-w-0 items-center gap-3 text-left"
+      aria-label="Go to outlets"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#34D399] text-[#07140D]">
+        <Icon name="chef" className="h-5 w-5" />
+      </span>
+
+      <span className="min-w-0">
+        <span className="block truncate text-[14px] font-bold tracking-tight text-[#F1F1EE]">
+          Kitchen Margin
+        </span>
+        <span className="mt-0.5 block font-mono text-[9px] tracking-[0.16em] text-[#7F877F]">
+          OPERATIONS SYSTEM
+        </span>
+      </span>
+    </button>
+  );
+}
+
+export function Backdrop() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-0 bg-[#0C0E0D]"
+    />
   );
 }
 
@@ -41,86 +128,175 @@ export default function Layout() {
   const user = getUser();
   const navigate = useNavigate();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const visibleNavigation = navigation.filter((item) => item.visible(user));
+  const roleLabel = roleLabels[user?.role] || 'ACCOUNT';
+
+  const initials = (user?.name || 'U')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
 
   function handleLogout() {
     logout();
-    navigate('/login');
+    navigate('/login', { replace: true });
   }
 
-  const close = () => setMenuOpen(false);
-  const nav = (
-    <>
-      <div className="mb-8 flex items-center gap-3 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-500/30">
-          <Icon name="chef" className="w-5 h-5" strokeWidth={2.2} />
-        </div>
-        <div>
-          <p className="text-sm font-bold leading-tight text-white">Kitchen Margin</p>
-          <p className="text-xs text-slate-400">Tracker</p>
-        </div>
-      </div>
+  function closeMobileMenu() {
+    setMobileOpen(false);
+  }
 
-      <nav className="flex flex-1 flex-col gap-1">
-        <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Menu</p>
-        {canViewProfit(user) && <NavItem to="/dashboard" icon="dashboard" label="Dashboard" onClick={close} />}
-        <NavItem to="/outlets" icon="store" label="Outlets" onClick={close} />
-        {isOwner() && <NavItem to="/team" icon="users" label="Team" onClick={close} />}
-        <NavItem to="/profile" icon="user" label="Profile" onClick={close} />
-      </nav>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 text-sm font-bold text-white">
-            {(user.name || '?').charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-white">{user.name}</p>
-            <RoleBadge role={user.role} />
-          </div>
-        </div>
-        <button onClick={handleLogout}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2 text-sm text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-300">
-          <Icon name="logout" className="w-4 h-4" /> Log out
-        </button>
-      </div>
-    </>
-  );
+  function goToOutlets() {
+    closeMobileMenu();
+    navigate('/outlets');
+  }
 
   return (
-    <div className="min-h-screen">
-      <Backdrop />
-
-      {/* Desktop sidebar */}
-      <aside className="glass fixed inset-y-4 left-4 z-30 hidden w-64 flex-col rounded-3xl p-5 lg:flex animate-fade-in">{nav}</aside>
-
-      {/* Mobile top bar + slide-in drawer */}
-      <header className="glass sticky top-0 z-30 flex items-center justify-between px-4 py-3 lg:hidden">
-        <div className="flex items-center gap-2 font-bold text-white">
-          <Icon name="chef" className="w-5 h-5 text-emerald-300" /> Kitchen Margin
-        </div>
-        <button onClick={() => setMenuOpen(true)} className="rounded-lg p-2 text-slate-300 hover:bg-white/10" aria-label="Open menu">
-          <Icon name="menu" />
+    <div className="relative min-h-screen bg-[#0C0E0D] text-[#F1F1EE]">
+      {/* Mobile top bar */}
+      <header className="sticky top-0 z-40 flex h-[62px] items-center justify-between border-b border-[#2A2F2B] bg-[#121513] px-4 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-[#A0A69F] transition-colors hover:bg-[#242925] hover:text-[#F1F1EE]"
+        >
+          <Icon name="menu" className="h-5 w-5" />
         </button>
+
+        <Brand onClick={goToOutlets} />
+
+        <span className="w-9" />
       </header>
-      {menuOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm animate-fade-in" onClick={close} />
-          <aside className="glass-strong absolute inset-y-0 left-0 flex w-72 flex-col p-5 animate-slide-in-right">
-            <button onClick={close} className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 hover:bg-white/10" aria-label="Close menu">
-              <Icon name="x" />
-            </button>
-            {nav}
-          </aside>
-        </div>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation overlay"
+          onClick={closeMobileMenu}
+          className="fixed inset-0 z-40 bg-black/65 lg:hidden"
+        />
       )}
 
-      {/* key = path so every page plays its enter transition */}
-      <main key={location.pathname} className="px-4 py-8 sm:px-8 lg:ml-72 lg:py-10">
-        <div className="mx-auto max-w-6xl">
-          <Outlet />
+      <div className="flex min-h-screen">
+        {/* Sidebar */}
+        <aside
+          className={[
+            'fixed inset-y-0 left-0 z-50 flex w-[260px] shrink-0 flex-col',
+            'border-r border-[#2A2F2B] bg-[#121513]',
+            'transition-transform duration-200 ease-out',
+            'lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
+            mobileOpen ? 'translate-x-0' : '-translate-x-full',
+          ].join(' ')}
+        >
+          {/* Brand header */}
+          <div className="flex h-[76px] shrink-0 items-center justify-between border-b border-[#2A2F2B] px-5">
+            <Brand onClick={goToOutlets} />
+
+            <button
+              type="button"
+              onClick={closeMobileMenu}
+              aria-label="Close navigation"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-[#858D85] transition-colors hover:bg-[#242925] hover:text-[#F1F1EE] lg:hidden"
+            >
+              <Icon name="x" className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Account */}
+          <div className="border-b border-[#2A2F2B] px-5 py-5">
+            <p className="mb-2 font-mono text-[9px] font-medium tracking-[0.16em] text-[#747D75]">
+              SIGNED IN AS
+            </p>
+
+            <p className="truncate text-[13px] font-semibold text-[#F1F1EE]">
+              {user?.name || 'Account'}
+            </p>
+
+            <div className="mt-2 flex min-w-0 items-center gap-2">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#34D399]" />
+              <span className="truncate text-[11px] text-[#929891]">
+                {user?.email || 'Signed in'}
+              </span>
+            </div>
+
+            <span className="mt-3 inline-flex rounded border border-[#285B46] bg-[#14251D] px-2 py-1 font-mono text-[9px] font-medium tracking-[0.12em] text-[#34D399]">
+              {roleLabel}
+            </span>
+          </div>
+
+          {/* Navigation */}
+          <nav
+            aria-label="Main navigation"
+            className="flex-1 space-y-1 overflow-y-auto px-3 py-5"
+          >
+            <p className="mb-3 px-3 font-mono text-[9px] font-medium tracking-[0.18em] text-[#747D75]">
+              WORKSPACE
+            </p>
+
+            {visibleNavigation.map((item) => (
+              <NavItem
+                key={item.path}
+                item={item}
+                onNavigate={closeMobileMenu}
+              />
+            ))}
+          </nav>
+
+          {/* Sidebar footer */}
+          <div className="border-t border-[#2A2F2B] p-3">
+            <div className="mb-2 flex items-center gap-3 rounded-lg border border-[#2A2F2B] bg-[#171B18] p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#285B46] bg-[#14251D] font-mono text-xs font-semibold text-[#34D399]">
+                {initials || 'U'}
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-[#F1F1EE]">
+                  {user?.name || 'User'}
+                </p>
+                <p className="mt-0.5 truncate font-mono text-[9px] tracking-wider text-[#858D85]">
+                  {roleLabel}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-[12px] font-medium text-[#929891] transition-colors hover:bg-[#2B1D1D] hover:text-[#B5242F]"
+            >
+              <Icon name="logout" className="h-4 w-4" />
+              Sign out
+            </button>
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+          <main
+            key={location.pathname}
+            className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+          >
+            <Outlet />
+          </main>
+
+          <footer className="border-t border-[#252A26] px-5 py-4">
+            <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2">
+              <span className="font-mono text-[9px] tracking-[0.13em] text-[#737B74]">
+                KITCHEN MARGIN TRACKER
+              </span>
+
+              <span className="font-mono text-[9px] tracking-[0.1em] text-[#555D56]">
+                OPERATIONS &amp; FINANCIAL CONTROL
+              </span>
+            </div>
+          </footer>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

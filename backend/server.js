@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -10,11 +11,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Kitchen staff are limited to viewing data and adding orders, whatever route they call
+// Kitchen staff are limited to viewing data and adding orders.
 app.use(require('./staffGuard'));
 
 app.use('/auth', require('./auth')());
 app.use('/users', require('./users')());
+app.use('/activity', require('./activity')());
 app.use('/outlets', require('./outlets')());
 app.use('/dishes', require('./dishes')());
 app.use('/platforms', require('./platforms')());
@@ -27,24 +29,41 @@ app.use('/ai', require('./ai')());
 app.get('/health', async (req, res) => {
   try {
     await mongoose.connection.db.admin().ping();
-    res.json({ status: 'ok', db: mongoose.connection.name, time: new Date() });
+    res.json({
+      status: 'ok',
+      db: mongoose.connection.name,
+      time: new Date()
+    });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
+    res.status(500).json({
+      status: 'error',
+      message: err.message
+    });
   }
 });
 
-// The delivery platforms every outlet starts with
+// The delivery platforms every outlet starts with.
 async function ensureDefaultPlatforms() {
   for (const name of ['Zomato', 'Swiggy', 'Direct']) {
-    await Platform.updateOne({ name }, { $setOnInsert: { name } }, { upsert: true });
+    await Platform.updateOne(
+      { name },
+      { $setOnInsert: { name } },
+      { upsert: true }
+    );
   }
 }
 
 async function start() {
   await mongoose.connect(MONGODB_URI);
   await ensureDefaultPlatforms();
+
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`Server running on port ${PORT} (MongoDB: ${mongoose.connection.name})`));
+
+  app.listen(PORT, () => {
+    console.log(
+      `Server running on port ${PORT} (MongoDB: ${mongoose.connection.name})`
+    );
+  });
 }
 
 start().catch((err) => {
